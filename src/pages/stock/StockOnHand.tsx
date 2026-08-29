@@ -98,7 +98,7 @@ export function StockOnHand() {
           <Card>
             <div className="stat">
               <div className="label">Lines shown</div>
-              <div className="value">{balances.data?.total ?? 0}</div>
+              <div className="value">{balances.data?.items.length ?? 0}</div>
             </div>
           </Card>
         </div>
@@ -243,7 +243,8 @@ export function StockOnHand() {
 
         <div style={{ padding: "0 0.9rem 0.9rem" }}>
           <Pager
-            total={balances.data?.total ?? 0}
+            total={balances.data?.total ?? null}
+            hasMore={balances.data?.hasMore ?? false}
             limit={limit}
             offset={offset}
             onChange={setOffset}

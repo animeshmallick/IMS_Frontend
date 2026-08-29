@@ -243,7 +243,7 @@ export function CycleCountPanel() {
               </tr>
             }
           >
-            {health.data.byClass.map((row) => (
+            {(health.data.byClass ?? []).map((row) => (
               <tr key={row.abcClass}>
                 <td>
                   <Badge tone={CLASS_TONE[row.abcClass]}>{row.abcClass}</Badge>

@@ -346,18 +346,56 @@ export function Form({
   );
 }
 
-/** Offset/limit pager matching the backend's `meta` envelope. */
+/**
+ * Offset/limit pager matching the backend's `meta` envelope.
+ *
+ * `total` may be null: some endpoints are grouped aggregates where counting
+ * costs a second full scan, so they report `hasMore` instead. With no total
+ * there is no last page to jump to and no "of N" to show — the pager falls back
+ * to "showing 51–100" and a Next button driven by `hasMore`.
+ */
 export function Pager({
   total,
+  hasMore = false,
   limit,
   offset,
   onChange,
 }: {
-  total: number;
+  total: number | null;
+  hasMore?: boolean;
   limit: number;
   offset: number;
   onChange: (offset: number) => void;
 }) {
+  if (total === null) {
+    if (offset === 0 && !hasMore) return null;
+    return (
+      <div className="spread mt small muted">
+        <span>
+          {offset + 1}–{offset + limit}
+        </span>
+        <div className="btn-row">
+          <button
+            type="button"
+            className="sm"
+            disabled={offset === 0}
+            onClick={() => onChange(Math.max(0, offset - limit))}
+          >
+            Previous
+          </button>
+          <button
+            type="button"
+            className="sm"
+            disabled={!hasMore}
+            onClick={() => onChange(offset + limit)}
+          >
+            Next
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   if (total <= limit) return null;
   const from = offset + 1;
   const to = Math.min(offset + limit, total);
