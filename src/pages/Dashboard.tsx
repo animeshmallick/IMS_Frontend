@@ -2,6 +2,8 @@ import { Link } from "react-router-dom";
 import { useApi } from "../lib/hooks";
 import { useSessionContext } from "../lib/session";
 import { Card, Empty, PageHead, QueryState, Table, Badge } from "../components/ui";
+import { SkeletonStats } from "../components/feedback";
+import { Clock, type LucideIcon, PackageSearch, Truck } from "lucide-react";
 import { money, qty, date, daysUntil } from "../lib/format";
 import type { DashboardTotals, ExpiringBatch, InTransitRow, ReorderRow } from "../lib/types";
 
@@ -39,12 +41,22 @@ export function Dashboard() {
 
   const showMoney = can("report:financial");
 
+  const expiringCount = expiring.data?.length ?? 0;
+  const reorderCount = reorder.data?.length ?? 0;
+  const inTransitCount = inTransit.data?.length ?? 0;
+
   return (
     <>
       <PageHead
         title={`Good day, ${session.user.name.split(" ")[0]}`}
         subtitle={activeLocation ? `Working at ${activeLocation.name}` : "No working location set"}
       />
+
+      {can("report:operational") && totals.isPending ? (
+        <div className="mb">
+          <SkeletonStats count={showMoney ? 4 : 1} />
+        </div>
+      ) : null}
 
       {can("report:operational") && totals.data ? (
         <div className="grid cols-4 mb">
@@ -78,6 +90,39 @@ export function Dashboard() {
               </Card>
             </>
           ) : null}
+        </div>
+      ) : null}
+
+      {/*
+        * What needs a decision, counted.
+        *
+        * The tables below say WHAT; this says HOW MUCH, which is the thing you
+        * want before deciding whether to open the screen at all. Each figure is
+        * a link, because a count nobody can act on is decoration.
+        */}
+      {can("stock:read") ? (
+        <div className="attention mb">
+          <AttentionItem
+            icon={Clock}
+            tone={expiringCount > 0 ? "warn" : "neutral"}
+            count={expiringCount}
+            label="expiring within 45 days"
+            to="/stock"
+          />
+          <AttentionItem
+            icon={PackageSearch}
+            tone={reorderCount > 0 ? "danger" : "neutral"}
+            count={reorderCount}
+            label="below reorder point"
+            to="/replenishment"
+          />
+          <AttentionItem
+            icon={Truck}
+            tone="neutral"
+            count={inTransitCount}
+            label="lines still in transit"
+            to="/transfers"
+          />
         </div>
       ) : null}
 
@@ -216,5 +261,34 @@ export function Dashboard() {
         </Card>
       ) : null}
     </>
+  );
+}
+
+/**
+ * One figure from the attention strip.
+ *
+ * Zero is rendered plainly rather than hidden: "nothing is expiring" is
+ * information, and a strip that changes shape depending on the day is harder to
+ * read at a glance than one that always says the same three things.
+ */
+function AttentionItem({
+  icon: Icon,
+  tone,
+  count,
+  label,
+  to,
+}: {
+  icon: LucideIcon;
+  tone: "neutral" | "warn" | "danger";
+  count: number;
+  label: string;
+  to: string;
+}) {
+  return (
+    <Link to={to} className={`attention-item ${count > 0 ? tone : "neutral"}`}>
+      <Icon size={16} aria-hidden />
+      <span className="attention-count">{count}</span>
+      <span className="small muted">{label}</span>
+    </Link>
   );
 }

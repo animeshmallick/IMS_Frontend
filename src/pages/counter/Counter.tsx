@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useApi, useInvalidate } from "../../lib/hooks";
 import { useSessionContext } from "../../lib/session";
@@ -61,6 +61,20 @@ export function Counter() {
   const [payOpen, setPayOpen] = useState(false);
   const [weighing, setWeighing] = useState<PickedItem | null>(null);
   const [cachedShiftId, setCachedShiftId] = useState<string | null>(null);
+
+  /*
+   * The scan field is home.
+   *
+   * A till is driven with a scanner in one hand and goods in the other, so
+   * every path through this screen has to end with the caret back in the scan
+   * box. Miss it once and the next scan types itself into whatever had focus —
+   * a quantity box, a search field, nothing at all — and the cashier finds out
+   * when the barcode does not appear.
+   */
+  const scanRef = useRef<HTMLDivElement>(null);
+  const focusScan = useCallback(() => {
+    scanRef.current?.querySelector("input")?.focus();
+  }, []);
 
   const shift = useApi<Shift | null>(
     ["counter", "shift", locationId],
@@ -224,6 +238,42 @@ export function Counter() {
   const lineCount = offlineMode ? offlineLines.length : (cart?.lines.length ?? 0);
   const displayTotal = offlineMode ? offlineTotal : (cart?.total ?? "0");
 
+  /*
+   * Function keys, not chords.
+   *
+   * F-keys are unclaimed by the browser and reachable without leaving the home
+   * position; ⌘/Ctrl combinations are already taken by the browser and get
+   * intercepted before the page sees them. Nothing here is destructive without
+   * a confirmation behind it.
+   */
+  useEffect(() => {
+    function onKey(event: KeyboardEvent) {
+      const typing =
+        event.target instanceof HTMLElement &&
+        /^(INPUT|TEXTAREA|SELECT)$/.test(event.target.tagName);
+
+      if (event.key === "F2") {
+        event.preventDefault();
+        setPayOpen((open) => (lineCount > 0 ? !open : open));
+        return;
+      }
+      if (event.key === "F4") {
+        event.preventDefault();
+        focusScan();
+        return;
+      }
+      // Escape leaves a field rather than abandoning a bill: a cashier hitting
+      // it to clear a mistyped quantity must never lose the whole sale.
+      if (event.key === "Escape" && typing) {
+        (event.target as HTMLElement).blur();
+        focusScan();
+      }
+    }
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [focusScan, lineCount]);
+
+
   // Offline we cannot check whether a shift is open; the cached one is the best
   // available answer, and blocking the sale would defeat the point.
   const shiftReady = offlineMode ? Boolean(cachedShiftId) : shift.data?.status === "open";
@@ -279,7 +329,7 @@ export function Counter() {
       <div className="pos">
         <div>
           <Card title="Scan or search">
-            <div className="pos-scan">
+            <div className="pos-scan" ref={scanRef}>
               {offlineMode ? (
                 <OfflinePicker
                   onPick={(item) => (item.isDivisible ? setWeighing(item) : void addItem(item))}
@@ -418,13 +468,25 @@ export function Counter() {
 
             <button
               type="button"
-              className="primary mt"
-              style={{ width: "100%", justifyContent: "center", padding: "0.7rem" }}
+              className="primary lg block mt"
               disabled={lineCount === 0 || busy}
               onClick={() => setPayOpen(true)}
             >
               Take payment
+              <kbd>F2</kbd>
             </button>
+
+            <div className="keyhints">
+              <span>
+                <kbd>F2</kbd> Pay
+              </span>
+              <span>
+                <kbd>F4</kbd> Back to scan
+              </span>
+              <span>
+                <kbd>Esc</kbd> Leave field
+              </span>
+            </div>
           </Card>
 
           {!offlineMode && cart ? (
