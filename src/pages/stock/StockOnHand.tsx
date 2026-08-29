@@ -14,6 +14,8 @@ import {
   useDebounced,
 } from "../../components/ui";
 import { date, daysUntil, money, qty } from "../../lib/format";
+import { SkeletonStats } from "../../components/feedback";
+import { Search } from "lucide-react";
 import type { Location, StockBalance, Valuation } from "../../lib/types";
 
 /**
@@ -58,6 +60,16 @@ export function StockOnHand() {
     0,
   );
 
+  const filtered = Boolean(search) || Boolean(locationId) || belowReorder || includeZero;
+
+  const clearFilters = () => {
+    setSearch("");
+    setLocationId("");
+    setBelowReorder(false);
+    setIncludeZero(false);
+    setOffset(0);
+  };
+
   return (
     <>
       <PageHead
@@ -79,41 +91,62 @@ export function StockOnHand() {
         }
       />
 
-      {can("report:financial") && valuation.data ? (
-        <div className="grid cols-3 mb">
-          <Card>
-            <div className="stat">
-              <div className="label">Stock value</div>
-              <div className="value">{money(totalValue)}</div>
-              <div className="hint">At batch cost{locationId ? ", this location" : ", all locations"}</div>
-            </div>
-          </Card>
-          <Card>
-            <div className="stat">
-              <div className="label">In transit</div>
-              <div className="value">{money(valuation.data.inTransitValue)}</div>
-              <div className="hint">Dispatched but not yet received</div>
-            </div>
-          </Card>
-          <Card>
-            <div className="stat">
-              <div className="label">Lines shown</div>
-              <div className="value">{balances.data?.items.length ?? 0}</div>
-            </div>
-          </Card>
+{/*
+        * Only the money figures need report:financial. Gating the whole block
+        * on it left a storekeeper — the person who uses this screen most — with
+        * no summary at all.
+        */}
+      {can("report:financial") && valuation.isPending ? (
+        <div className="mb">
+          <SkeletonStats count={3} />
         </div>
       ) : null}
 
+      <div className="grid cols-3 mb">
+        {can("report:financial") && valuation.data ? (
+          <>
+            <Card>
+              <div className="stat">
+                <div className="label">Stock value</div>
+                <div className="value">{money(totalValue)}</div>
+                <div className="hint">
+                  At batch cost{locationId ? ", this location" : ", all locations"}
+                </div>
+              </div>
+            </Card>
+            <Card>
+              <div className="stat">
+                <div className="label">In transit</div>
+                <div className="value">{money(valuation.data.inTransitValue)}</div>
+                <div className="hint">Dispatched but not yet received</div>
+              </div>
+            </Card>
+          </>
+        ) : null}
+        <Card>
+          <div className="stat">
+            <div className="label">Lines shown</div>
+            <div className="value">{balances.data?.items.length ?? 0}</div>
+            <div className="hint">
+              {belowReorder ? "Below reorder point only" : "Matching your filters"}
+            </div>
+          </div>
+        </Card>
+      </div>
+
       <div className="filters">
         <Field label="Search">
-          <input
-            value={search}
-            placeholder="SKU, name or barcode"
-            onChange={(e) => {
-              setSearch(e.target.value);
-              setOffset(0);
-            }}
-          />
+          <div className="input-icon">
+            <Search size={14} aria-hidden />
+            <input
+              value={search}
+              placeholder="SKU, name or barcode"
+              onChange={(e) => {
+                setSearch(e.target.value);
+                setOffset(0);
+              }}
+            />
+          </div>
         </Field>
 
         <Field label="Location">
@@ -135,33 +168,35 @@ export function StockOnHand() {
           </select>
         </Field>
 
-        <Field label=" ">
-          <label className="row small">
-            <input
-              type="checkbox"
-              checked={belowReorder}
-              onChange={(e) => {
-                setBelowReorder(e.target.checked);
-                setOffset(0);
-              }}
-            />
-            Below reorder point
-          </label>
-        </Field>
+        <label className="check">
+          <input
+            type="checkbox"
+            checked={belowReorder}
+            onChange={(e) => {
+              setBelowReorder(e.target.checked);
+              setOffset(0);
+            }}
+          />
+          Below reorder point
+        </label>
 
-        <Field label=" ">
-          <label className="row small">
-            <input
-              type="checkbox"
-              checked={includeZero}
-              onChange={(e) => {
-                setIncludeZero(e.target.checked);
-                setOffset(0);
-              }}
-            />
-            Include zero balances
-          </label>
-        </Field>
+        <label className="check">
+          <input
+            type="checkbox"
+            checked={includeZero}
+            onChange={(e) => {
+              setIncludeZero(e.target.checked);
+              setOffset(0);
+            }}
+          />
+          Include zero balances
+        </label>
+
+        {filtered ? (
+          <button type="button" className="ghost sm" onClick={clearFilters}>
+            Clear filters
+          </button>
+        ) : null}
       </div>
 
       <Card flush>
@@ -193,10 +228,19 @@ export function StockOnHand() {
               const low =
                 row.reorderPoint !== null && Number(row.available) <= Number(row.reorderPoint);
 
+              /*
+               * Expired stock outranks a low balance: one is money already
+               * lost, the other is a purchase to plan. Only one stripe fits, so
+               * the more urgent wins.
+               */
+              const tone = days !== null && days < 0 ? "danger" : low ? "warn" : "";
+
               return (
-                <tr key={`${row.variantId}-${row.locationId}`}>
+                <tr key={`${row.variantId}-${row.locationId}`} className={tone}>
                   <td>
-                    <Link to={`/stock/ledger?variantId=${row.variantId}`}>{row.sku}</Link>
+                    <Link to={`/stock/ledger?variantId=${row.variantId}`} className="mono">
+                      {row.sku}
+                    </Link>
                     <span className="sub">
                       {row.productName}
                       {row.variantName ? ` · ${row.variantName}` : ""}
@@ -241,7 +285,7 @@ export function StockOnHand() {
           </Table>
         </QueryState>
 
-        <div style={{ padding: "0 0.9rem 0.9rem" }}>
+        <div className="card-foot">
           <Pager
             total={balances.data?.total ?? null}
             hasMore={balances.data?.hasMore ?? false}

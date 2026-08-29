@@ -147,7 +147,7 @@ export function Transfers() {
           </Table>
         </QueryState>
 
-        <div style={{ padding: "0 0.9rem 0.9rem" }}>
+        <div className="card-foot">
           <Pager
             total={transfers.data?.total ?? 0}
             limit={limit}

@@ -109,7 +109,7 @@ export function Suppliers() {
           </Table>
         </QueryState>
 
-        <div style={{ padding: "0 0.9rem 0.9rem" }}>
+        <div className="card-foot">
           <Pager
             total={suppliers.data?.total ?? 0}
             limit={limit}

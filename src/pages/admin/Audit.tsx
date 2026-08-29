@@ -130,7 +130,7 @@ export function AuditTrail() {
           </Table>
         </QueryState>
 
-        <div style={{ padding: "0 0.9rem 0.9rem" }}>
+        <div className="card-foot">
           <Pager
             total={entries.data?.total ?? 0}
             limit={limit}

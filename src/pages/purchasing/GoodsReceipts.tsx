@@ -15,17 +15,31 @@ import type { GoodsReceiptListItem, Location } from "../../lib/types";
 export function GoodsReceipts() {
   const navigate = useNavigate();
   const [locationId, setLocationId] = useState("");
+  const [draftsOnly, setDraftsOnly] = useState(false);
   const [offset, setOffset] = useState(0);
   const limit = 25;
 
   const locations = useApi<Location[]>(["locations"], "/locations");
-  const receipts = useApiList<GoodsReceiptListItem>(["goods-receipts"], "/goods-receipts", {
-    locationId: locationId || undefined,
-    limit,
-    offset,
-  });
+  const receipts = useApiList<GoodsReceiptListItem>(
+    ["goods-receipts", draftsOnly],
+    "/goods-receipts",
+    {
+      locationId: locationId || undefined,
+      status: draftsOnly ? "draft" : undefined,
+      limit,
+      offset,
+    },
+  );
 
-  const drafts = (receipts.data?.items ?? []).filter((r) => r.status === "draft").length;
+  const items = receipts.data?.items ?? [];
+  const drafts = items.filter((r) => r.status === "draft").length;
+  const filtered = Boolean(locationId) || draftsOnly;
+
+  const clear = () => {
+    setLocationId("");
+    setDraftsOnly(false);
+    setOffset(0);
+  };
 
   return (
     <>
@@ -39,10 +53,30 @@ export function GoodsReceipts() {
         }
       />
 
-      {drafts > 0 ? (
+      {/*
+       * A draft receipt is stock that has physically arrived and that the system
+       * still believes is not here. That is worth interrupting for — and worth
+       * making actionable, so the warning filters the list rather than merely
+       * mentioning a number and leaving the reader to find them.
+       */}
+      {drafts > 0 && !draftsOnly ? (
         <div className="alert warn">
-          {drafts} receipt{drafts === 1 ? " is" : "s are"} still a draft. Stock does not move until a
-          receipt is posted.
+          <div className="grow">
+            <strong>
+              {drafts} receipt{drafts === 1 ? " is" : "s are"} still a draft.
+            </strong>{" "}
+            Stock does not move until a receipt is posted.
+          </div>
+          <button
+            type="button"
+            className="sm"
+            onClick={() => {
+              setDraftsOnly(true);
+              setOffset(0);
+            }}
+          >
+            Show them
+          </button>
         </div>
       ) : null}
 
@@ -65,6 +99,24 @@ export function GoodsReceipts() {
               ))}
           </select>
         </Field>
+
+        <label className="check">
+          <input
+            type="checkbox"
+            checked={draftsOnly}
+            onChange={(e) => {
+              setDraftsOnly(e.target.checked);
+              setOffset(0);
+            }}
+          />
+          Drafts only
+        </label>
+
+        {filtered ? (
+          <button type="button" className="ghost sm" onClick={clear}>
+            Clear filters
+          </button>
+        ) : null}
       </div>
 
       <Card flush>
@@ -72,8 +124,12 @@ export function GoodsReceipts() {
           query={{ ...receipts, data: receipts.data?.items }}
           empty={
             <Empty
-              title="No deliveries recorded"
-              hint="Open a purchase order that has been placed, then use “Record delivery”."
+              title={draftsOnly ? "No drafts" : "No deliveries recorded"}
+              hint={
+                draftsOnly
+                  ? "Every receipt here has been posted."
+                  : "Open a purchase order that has been placed, then use “Record delivery”."
+              }
             />
           }
         >
@@ -89,18 +145,23 @@ export function GoodsReceipts() {
               </tr>
             }
           >
-            {(receipts.data?.items ?? []).map((grn) => (
+            {items.map((grn) => (
               <tr
                 key={grn.id}
-                className="clickable"
+                className={grn.status === "draft" ? "clickable warn" : "clickable"}
                 onClick={() => navigate(`/goods-receipts/${grn.id}`)}
               >
                 <td>
-                  <Link to={`/goods-receipts/${grn.id}`}>{grn.grnNumber}</Link>
+                  <Link to={`/goods-receipts/${grn.id}`} className="mono">
+                    {grn.grnNumber}
+                  </Link>
+                  {grn.status === "draft" ? (
+                    <span className="sub warn">Stock not moved yet</span>
+                  ) : null}
                 </td>
-                <td className="small">{grn.poNumber}</td>
+                <td className="small mono">{grn.poNumber}</td>
                 <td className="small">{grn.locationName}</td>
-                <td className="small">{grn.supplierInvoiceNo ?? "—"}</td>
+                <td className="small mono">{grn.supplierInvoiceNo ?? "—"}</td>
                 <td>
                   <Badge tone={statusTone(grn.status)}>{humanise(grn.status)}</Badge>
                 </td>
@@ -110,9 +171,10 @@ export function GoodsReceipts() {
           </Table>
         </QueryState>
 
-        <div style={{ padding: "0 0.9rem 0.9rem" }}>
+        <div className="card-foot">
           <Pager
-            total={receipts.data?.total ?? 0}
+            total={receipts.data?.total ?? null}
+            hasMore={receipts.data?.hasMore ?? false}
             limit={limit}
             offset={offset}
             onChange={setOffset}

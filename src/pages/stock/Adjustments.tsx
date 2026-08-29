@@ -145,7 +145,7 @@ export function Adjustments() {
           </Table>
         </QueryState>
 
-        <div style={{ padding: "0 0.9rem 0.9rem" }}>
+        <div className="card-foot">
           <Pager
             total={adjustments.data?.total ?? 0}
             limit={limit}
