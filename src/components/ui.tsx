@@ -1,6 +1,6 @@
+import * as DialogPrimitive from "@radix-ui/react-dialog";
 import {
   useEffect,
-  useRef,
   useState,
   type ReactNode,
   type FormEvent,
@@ -8,6 +8,7 @@ import {
   type SelectHTMLAttributes,
 } from "react";
 import { ApiError } from "../lib/api";
+import { SkeletonTable } from "./feedback";
 
 /**
  * Shared presentational pieces.
@@ -118,13 +119,21 @@ export function Loading({ label = "Loading..." }: { label?: string }) {
 export function QueryState({
   query,
   empty,
+  skeleton,
   children,
 }: {
   query: { isPending: boolean; isError: boolean; error: unknown; data?: unknown };
   empty?: ReactNode;
+  skeleton?: ReactNode;
   children: ReactNode;
 }) {
-  if (query.isPending) return <Loading />;
+  /*
+   * A skeleton rather than a spinner: it reserves the space the rows will take,
+   * so the page does not jump when they arrive and the eye is already in the
+   * right place. `skeleton` lets a caller shape it like the content it is
+   * standing in for.
+   */
+  if (query.isPending) return skeleton ?? <SkeletonTable />;
   if (query.isError) return <ErrorBanner error={query.error} />;
   if (empty && Array.isArray(query.data) && query.data.length === 0) return <>{empty}</>;
   return <>{children}</>;
@@ -192,11 +201,17 @@ export function Table({ head, children }: { head: ReactNode; children: ReactNode
 }
 
 /**
- * Modal.
+ * A modal dialog, on Radix.
  *
- * Escape closes and focus moves to the dialog on open — both because a till or a
- * receiving bay is often driven from the keyboard with a scanner in hand, and
- * reaching for a mouse to dismiss a dialog is the slowest thing on the screen.
+ * The behaviour that makes a dialog trustworthy is nearly all invisible: focus
+ * moves in on open and returns to the trigger on close, Tab is trapped inside,
+ * Escape dismisses, the page behind stops scrolling, and the rest of the app is
+ * hidden from screen readers while it is up. Hand-rolling that is a long tail
+ * of small bugs found by the people least able to work around them, so it is
+ * delegated.
+ *
+ * The props are unchanged from the hand-rolled version this replaces, so no
+ * caller needed editing.
  */
 export function Modal({
   title,
@@ -204,44 +219,37 @@ export function Modal({
   children,
   footer,
   narrow,
+  wide,
 }: {
   title: string;
   onClose: () => void;
   children: ReactNode;
   footer?: ReactNode;
   narrow?: boolean;
+  wide?: boolean;
 }) {
-  const ref = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    ref.current?.focus();
-    function onKey(event: KeyboardEvent) {
-      if (event.key === "Escape") onClose();
-    }
-    document.addEventListener("keydown", onKey);
-    return () => document.removeEventListener("keydown", onKey);
-  }, [onClose]);
-
   return (
-    <div className="modal-backdrop" onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
-      <div
-        className={narrow ? "modal narrow" : "modal"}
-        role="dialog"
-        aria-modal="true"
-        aria-label={title}
-        tabIndex={-1}
-        ref={ref}
-      >
-        <header className="modal-head">
-          <h2>{title}</h2>
-          <button type="button" className="ghost" onClick={onClose} aria-label="Close">
-            ✕
-          </button>
-        </header>
-        <div className="modal-body">{children}</div>
-        {footer ? <footer className="modal-foot">{footer}</footer> : null}
-      </div>
-    </div>
+    <DialogPrimitive.Root open onOpenChange={(open) => !open && onClose()}>
+      <DialogPrimitive.Portal>
+        <DialogPrimitive.Overlay className="modal-backdrop" />
+        <DialogPrimitive.Content
+          className={`modal${narrow ? " narrow" : ""}${wide ? " wide" : ""}`}
+        >
+          <header className="modal-head">
+            <DialogPrimitive.Title asChild>
+              <h2>{title}</h2>
+            </DialogPrimitive.Title>
+            <DialogPrimitive.Close asChild>
+              <button type="button" className="ghost" aria-label="Close">
+                ✕
+              </button>
+            </DialogPrimitive.Close>
+          </header>
+          <div className="modal-body">{children}</div>
+          {footer ? <footer className="modal-foot">{footer}</footer> : null}
+        </DialogPrimitive.Content>
+      </DialogPrimitive.Portal>
+    </DialogPrimitive.Root>
   );
 }
 

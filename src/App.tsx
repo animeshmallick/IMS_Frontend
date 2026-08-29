@@ -4,6 +4,7 @@ import { ApiError } from "./lib/api";
 import { SessionProvider, useSessionQuery } from "./lib/session";
 import { OfflineProvider } from "./lib/offline";
 import { SignIn } from "./pages/SignIn";
+import { ErrorBoundary, ToastProvider } from "./components/feedback";
 import { Shell } from "./components/Shell";
 import { Dashboard } from "./pages/Dashboard";
 import { StockOnHand } from "./pages/stock/StockOnHand";
@@ -391,10 +392,19 @@ function Authenticated() {
 
 export function App() {
   return (
-    <QueryClientProvider client={queryClient}>
-      <BrowserRouter>
-        <Authenticated />
-      </BrowserRouter>
-    </QueryClientProvider>
+    /*
+     * ErrorBoundary outermost, so a crash anywhere below still renders a page
+     * with a way out rather than the blank white screen React leaves when a
+     * render throws and nothing catches it.
+     */
+    <ErrorBoundary>
+      <QueryClientProvider client={queryClient}>
+        <ToastProvider>
+          <BrowserRouter>
+            <Authenticated />
+          </BrowserRouter>
+        </ToastProvider>
+      </QueryClientProvider>
+    </ErrorBoundary>
   );
 }

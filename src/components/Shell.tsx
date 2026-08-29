@@ -1,4 +1,5 @@
-import { NavLink, Outlet } from "react-router-dom";
+import { NavLink, Outlet, useLocation } from "react-router-dom";
+import { ErrorBoundary } from "./feedback";
 import { useQueryClient } from "@tanstack/react-query";
 import { signOut } from "../lib/auth";
 import { api } from "../lib/api";
@@ -81,6 +82,7 @@ const NAV: { heading: string; items: NavItem[] }[] = [
 export function Shell() {
   const { session, activeLocation, canAny } = useSessionContext();
   const queryClient = useQueryClient();
+  const { pathname } = useLocation();
 
   // Only real places can be worked at; the virtual counterparties in the ledger
   // are not somewhere a person stands.
@@ -168,7 +170,14 @@ export function Shell() {
               stock. Ask an administrator to grant you location access.
             </div>
           ) : null}
-          <Outlet />
+          {/*
+            * Keyed on the path so navigating away from a broken screen clears
+            * the error: without the key the boundary stays latched and every
+            * subsequent page renders the failure of the one before it.
+            */}
+          <ErrorBoundary key={pathname}>
+            <Outlet />
+          </ErrorBoundary>
         </main>
       </div>
     </div>
