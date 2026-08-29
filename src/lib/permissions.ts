@@ -24,4 +24,4 @@ export type Permission =
   | "report:operational" | "report:financial"
   | "user:read" | "user:write" | "user:assign_role"
   | "location:read" | "location:write"
-  | "audit:read" | "settings:write";
+  | "audit:read" | "alert:resolve" | "settings:write";

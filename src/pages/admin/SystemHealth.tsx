@@ -1,6 +1,13 @@
+import { useState } from "react";
 import { useApi, useApiMutation } from "../../lib/hooks";
+import { useSessionContext } from "../../lib/session";
 import { Badge, Card, Empty, ErrorBanner, PageHead, QueryState, Table } from "../../components/ui";
 import { dateTime, humanise } from "../../lib/format";
+
+/** Severity to the row-stripe class. Only unresolved rows are striped. */
+function toneOf(severity: Alert["severity"]): string {
+  return severity === "critical" ? "danger" : severity === "warning" ? "warn" : "";
+}
 
 interface Health {
   database: string;
@@ -30,7 +37,12 @@ interface Alert {
   locationName?: string;
   link?: string;
   createdAt: string;
+  /** The webhook fired. NOT the same as a person having dealt with it. */
   delivered: boolean;
+  resolved: boolean;
+  resolvedAt: string | null;
+  resolvedBy: string | null;
+  resolvedNote: string | null;
 }
 
 /**
@@ -41,10 +53,31 @@ interface Alert {
  * balance, and is anything queued that has not gone out.
  */
 export function SystemHealth() {
+  const { can } = useSessionContext();
+
   const health = useApi<Health>(["admin", "health"], "/alerts/health", undefined, {
     staleTime: 10_000,
   });
-  const alerts = useApi<Alert[]>(["alerts"], "/alerts", { limit: 50 });
+  /*
+   * Unresolved first, because that is the working list — the one that answers
+   * "what still needs somebody". The full history stays a click away rather
+   * than being the default, since an alert list that only grows is one people
+   * stop opening.
+   */
+  const [showResolved, setShowResolved] = useState(false);
+  const alerts = useApi<Alert[]>(["alerts", showResolved], "/alerts", {
+    limit: 100,
+    ...(showResolved ? {} : { unresolvedOnly: "true" }),
+  });
+
+  const resolve = useApiMutation<{ id: number; note?: string }, void>(
+    (input) => `/alerts/${input.id}/resolve`,
+    { invalidate: [["alerts"]] },
+  );
+  const reopen = useApiMutation<{ id: number }, void>(
+    (input) => `/alerts/${input.id}/resolve`,
+    { method: "DELETE", invalidate: [["alerts"]] },
+  );
 
   const scan = useApiMutation<undefined, { raised: number }>("/alerts/scan", {
     method: "POST",
@@ -161,11 +194,21 @@ export function SystemHealth() {
       <Card
         title="Recent alerts"
         actions={
-          data && !data.alertDeliveryConfigured ? (
-            <span className="small muted">
-              Set ALERT_WEBHOOK_URL to also push these to WhatsApp, Slack or email
-            </span>
-          ) : null
+          <>
+            {data && !data.alertDeliveryConfigured ? (
+              <span className="small muted">
+                Set ALERT_WEBHOOK_URL to also push these to WhatsApp, Slack or email
+              </span>
+            ) : null}
+            <label className="check small">
+              <input
+                type="checkbox"
+                checked={showResolved}
+                onChange={(event) => setShowResolved(event.target.checked)}
+              />
+              Include resolved
+            </label>
+          </>
         }
         flush
       >
@@ -180,12 +223,13 @@ export function SystemHealth() {
                 <th>Severity</th>
                 <th>What</th>
                 <th>Where</th>
-                <th>Sent</th>
+                <th>Status</th>
+                <th />
               </tr>
             }
           >
             {(alerts.data ?? []).map((alert) => (
-              <tr key={alert.id}>
+              <tr key={alert.id} className={alert.resolved ? "" : toneOf(alert.severity)}>
                 <td className="small nowrap">{dateTime(alert.createdAt)}</td>
                 <td>
                   <Badge
@@ -205,7 +249,55 @@ export function SystemHealth() {
                   <span className="sub">{alert.detail}</span>
                 </td>
                 <td className="small muted">{alert.locationName ?? "—"}</td>
-                <td className="small muted">{alert.delivered ? "yes" : "queued"}</td>
+                <td className="small">
+                  {alert.resolved ? (
+                    <>
+                      <Badge tone="success">Resolved</Badge>
+                      <span className="sub">
+                        {alert.resolvedBy}
+                        {alert.resolvedAt ? ` · ${dateTime(alert.resolvedAt)}` : ""}
+                      </span>
+                      {alert.resolvedNote ? <span className="sub">{alert.resolvedNote}</span> : null}
+                    </>
+                  ) : (
+                    <span className="muted">
+                      Open
+                      <span className="sub">{alert.delivered ? "Sent" : "Queued"}</span>
+                    </span>
+                  )}
+                </td>
+                <td className="right">
+                  {can("alert:resolve") ? (
+                    alert.resolved ? (
+                      <button
+                        type="button"
+                        className="ghost sm"
+                        disabled={reopen.isPending}
+                        onClick={() => reopen.mutate({ id: alert.id })}
+                      >
+                        Reopen
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        className="sm"
+                        disabled={resolve.isPending}
+                        onClick={() => {
+                          /*
+                           * The note is optional and asked for inline. A modal
+                           * per alert would make clearing a morning's worth of
+                           * them a chore, and a chore is how alert lists end up
+                           * ignored.
+                           */
+                          const note = window.prompt("What was done? (optional)") ?? undefined;
+                          resolve.mutate({ id: alert.id, note: note || undefined });
+                        }}
+                      >
+                        Resolve
+                      </button>
+                    )
+                  ) : null}
+                </td>
               </tr>
             ))}
           </Table>

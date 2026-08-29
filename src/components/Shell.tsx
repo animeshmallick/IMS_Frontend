@@ -181,32 +181,28 @@ export function Shell() {
   const [scrolled, setScrolled] = useState(false);
 
   /*
-   * Alerts raised in the last day.
+   * Unresolved alerts.
    *
    * Low stock, a till that did not balance, a ledger that drifted — nobody
    * goes looking for these, so the count has to come to them.
    *
-   * Deliberately "last 24 hours" and not "unread": alerts are outbox events
-   * and carry no acknowledged state, so a badge counting all of them would
-   * only ever climb, and a number that never goes down is one people stop
-   * reading. A rolling window clears itself and stays honest about what it is
-   * counting. `delivered` on these rows means the webhook fired, not that a
-   * person dealt with it — it is not a substitute.
+   * This counts what is genuinely still open, which is only meaningful because
+   * alerts now carry a resolution. The badge therefore goes DOWN when somebody
+   * deals with something, and a number that responds to work is one people keep
+   * reading. `delivered` is not a substitute: it means the webhook fired, not
+   * that a person acted.
    *
    * Stale-tolerant on purpose: an ambient signal, not a live feed worth
    * hammering the API for.
    */
-  const alerts = useApi<{ id: string; createdAt: string }[]>(
-    ["alerts", "recent"],
+  const alerts = useApi<{ id: number }[]>(
+    ["alerts", "unresolved"],
     "/alerts",
-    { limit: 100 },
+    { limit: 100, unresolvedOnly: "true" },
     { enabled: canAny("stock:read"), staleTime: 120_000 },
   );
 
-  const alertCount = (() => {
-    const since = Date.now() - 24 * 60 * 60 * 1000;
-    return (alerts.data ?? []).filter((a) => new Date(a.createdAt).getTime() >= since).length;
-  })();
+  const alertCount = alerts.data?.length ?? 0;
 
   // Any navigation closes the mobile drawer; leaving it open over the page the
   // user just asked for is the most common small annoyance in this pattern.
@@ -435,7 +431,7 @@ export function Shell() {
               <Link
                 to="/admin/health"
                 className="alert-bell"
-                title={`${alertCount} alert${alertCount === 1 ? "" : "s"} in the last 24 hours`}
+                title={`${alertCount} unresolved alert${alertCount === 1 ? "" : "s"}`}
               >
                 <Bell size={15} aria-hidden />
                 <span className="bell-count">{alertCount > 99 ? "99+" : alertCount}</span>
