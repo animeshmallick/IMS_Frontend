@@ -7,5 +7,7 @@ coverage/
 !.env.example
 *.log
 .DS_Store
-package-lock.json
 
+# package-lock.json is deliberately NOT ignored. Amplify's default build runs
+# `npm ci`, which refuses to run at all without it, and it is what pins the
+# exact dependency tree this app was built and tested against.
