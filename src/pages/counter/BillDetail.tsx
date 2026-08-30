@@ -13,6 +13,7 @@ import {
   Table,
 } from "../../components/ui";
 import { date, dateTime, humanise, money, qty } from "../../lib/format";
+import { useUnits } from "../../lib/use-units";
 import type { PaymentMethod, ReturnableLine, SalesOrder } from "../../lib/types";
 
 /**
@@ -26,6 +27,7 @@ export function BillDetailPage() {
   const { id } = useParams<{ id: string }>();
   const [params] = useSearchParams();
   const { can } = useSessionContext();
+  const units = useUnits();
   const [returning, setReturning] = useState(false);
 
   const order = useApi<SalesOrder>(["counter", "order", id], `/counter/orders/${id}`);
@@ -99,7 +101,8 @@ export function BillDetailPage() {
                     {line.productName}
                     <br />
                     <span className="muted">
-                      {qty(line.saleQty)} {line.saleUomCode} × {money(line.unitPrice)}
+                      {units.format(line.saleQty, line.saleUomCode)} ×{" "}
+                      {money(units.line(line.saleQty, line.saleUomCode, line.unitPrice).unitPrice)}
                     </span>
                   </td>
                   <td className="num">{money(line.lineTotal)}</td>
@@ -170,7 +173,7 @@ export function BillDetailPage() {
                   <span className="sub">{line.productName}</span>
                 </td>
                 <td className="num">
-                  {qty(line.saleQty)} <span className="muted small">{line.saleUomCode}</span>
+                  {units.format(line.saleQty, line.saleUomCode)}
                   {Number(line.returnedQtyBase) > 0 ? (
                     <span className="sub">
                       <Badge tone="warn">{qty(line.returnedQtyBase)} returned</Badge>

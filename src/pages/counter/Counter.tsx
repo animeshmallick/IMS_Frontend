@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { useUnits } from "../../lib/use-units";
 import {
   decodeInStoreLabel,
   gramsToQty,
@@ -21,7 +22,7 @@ import {
   TextField,
 } from "../../components/ui";
 import { VariantPicker } from "../../components/VariantPicker";
-import { date, money, multiplyMoney, qty, sumMoney } from "../../lib/format";
+import { date, money, multiplyMoney, sumMoney } from "../../lib/format";
 import type { Customer, PaymentMethod, SalesOrder, Shift, VariantSearchResult } from "../../lib/types";
 
 const COUNTER_CODE = "TILL-1";
@@ -57,6 +58,7 @@ export function Counter() {
   const { activeLocation, can } = useSessionContext();
   const invalidate = useInvalidate();
   const offline = useOffline();
+  const units = useUnits();
   const locationId = activeLocation?.id;
 
   const [cart, setCart] = useState<SalesOrder | null>(null);
@@ -410,7 +412,7 @@ export function Counter() {
                       <span className="sub">{line.productName}</span>
                     </td>
                     <td className="num">
-                      {qty(line.qty)} <span className="muted small">{line.stockUomCode}</span>
+                      {units.format(line.qty, line.stockUomCode)}
                     </td>
                     <td className="num">{money(line.unitPrice)}</td>
                     <td className="num">
@@ -458,7 +460,7 @@ export function Counter() {
                       ))}
                     </td>
                     <td className="num">
-                      {qty(line.saleQty)} <span className="muted small">{line.saleUomCode}</span>
+                      {units.format(line.saleQty, line.saleUomCode)}
                     </td>
                     <td className="num">{money(line.unitPrice)}</td>
                     <td className="num">

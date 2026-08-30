@@ -43,6 +43,14 @@ export interface Uom {
   dimension: "count" | "mass" | "volume" | "length" | "area";
   factorToBase: string;
   isDimensionBase: boolean;
+  /**
+   * Whether the app may choose this unit on its own when showing a quantity.
+   *
+   * Quintals and milligrams are real units and stay available for pinning and
+   * for the converter — they are just not how a shop talks about a bag of
+   * flour, and the automatic rule would otherwise reach for them.
+   */
+  autoDisplay: boolean;
 }
 
 export interface Category {

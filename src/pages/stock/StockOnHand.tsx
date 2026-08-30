@@ -13,8 +13,9 @@ import {
   Table,
   useDebounced,
 } from "../../components/ui";
-import { date, daysUntil, money, qty } from "../../lib/format";
+import { date, daysUntil, money } from "../../lib/format";
 import { SkeletonStats } from "../../components/feedback";
+import { useUnits } from "../../lib/use-units";
 import { Search } from "lucide-react";
 import type { Location, StockBalance, Valuation } from "../../lib/types";
 
@@ -28,6 +29,7 @@ import type { Location, StockBalance, Valuation } from "../../lib/types";
  */
 export function StockOnHand() {
   const { can, activeLocation } = useSessionContext();
+  const units = useUnits();
   const [search, setSearch] = useState("");
   const [locationId, setLocationId] = useState(activeLocation?.id ?? "");
   const [belowReorder, setBelowReorder] = useState(false);
@@ -247,12 +249,18 @@ export function StockOnHand() {
                     </span>
                   </td>
                   <td className="small">{row.locationName}</td>
-                  <td className="num">{qty(row.onHand)}</td>
+                  <td className="num">{units.format(row.onHand, row.stockUomCode)}</td>
                   <td className="num muted">
-                    {Number(row.reserved) > 0 ? qty(row.reserved) : "—"}
+                    {Number(row.reserved) > 0
+                      ? units.format(row.reserved, row.stockUomCode)
+                      : "—"}
                   </td>
                   <td className="num">
-                    <strong>{qty(row.available)}</strong> <span className="muted small">{row.stockUomCode}</span>
+                    {/* The unit is inside the formatted value now, so it is
+                        the DISPLAY unit rather than the stock unit — printing
+                        the stock unit beside a converted number would contradict
+                        it. */}
+                    <strong>{units.format(row.available, row.stockUomCode)}</strong>
                     {low ? (
                       <span className="sub">
                         <Badge tone="warn">Reorder</Badge>

@@ -11,6 +11,7 @@ import { StockOnHand } from "./pages/stock/StockOnHand";
 import { StockLedger } from "./pages/stock/StockLedger";
 import { SerialLookup } from "./pages/stock/SerialLookup";
 import { Labels } from "./pages/catalog/Labels";
+import { Units } from "./pages/admin/Units";
 import { Products } from "./pages/catalog/Products";
 import { ProductDetailPage } from "./pages/catalog/ProductDetail";
 import { NewProduct } from "./pages/catalog/NewProduct";
@@ -279,6 +280,14 @@ function Authenticated() {
             element={
               <RequirePermission permission="catalog:read">
                 <Products />
+              </RequirePermission>
+            }
+          />
+          <Route
+            path="admin/units"
+            element={
+              <RequirePermission permission="catalog:read">
+                <Units />
               </RequirePermission>
             }
           />
