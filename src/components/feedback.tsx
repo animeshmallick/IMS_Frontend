@@ -1,5 +1,13 @@
 import * as ToastPrimitive from "@radix-ui/react-toast";
-import { Component, createContext, useCallback, useContext, useMemo, useState } from "react";
+import {
+  Component,
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useState,
+} from "react";
 import type { ErrorInfo, ReactNode } from "react";
 
 /*
@@ -76,6 +84,24 @@ export class ErrorBoundary extends Component<
 type Tone = "success" | "error" | "warn" | "info";
 type ToastItem = { id: number; title: string; body?: string; tone: Tone };
 
+const TOAST_EVENT = "ims:toast";
+
+/**
+ * Raise a toast from outside React.
+ *
+ * A custom event rather than a module-level setState handle, matching how the
+ * command palette is opened: the provider stays the only thing that owns toast
+ * state, and nothing can hold a stale reference to an unmounted one.
+ *
+ * This exists so the query client — created before any component renders — can
+ * report a failed mutation. See the MutationCache in App.tsx.
+ */
+export function pushToast(title: string, options?: { body?: string; tone?: Tone }): void {
+  document.dispatchEvent(
+    new CustomEvent(TOAST_EVENT, { detail: { title, ...options } }),
+  );
+}
+
 const ToastContext = createContext<{
   toast: (title: string, options?: { body?: string; tone?: Tone }) => void;
 } | null>(null);
@@ -101,6 +127,25 @@ export function ToastProvider({ children }: { children: ReactNode }) {
   );
 
   const value = useMemo(() => ({ toast }), [toast]);
+
+  /*
+   * Toasts raised from outside React — currently every failed mutation, via the
+   * query client's MutationCache. Without this bridge a screen that forgot an
+   * error banner, or whose banner had scrolled out of view inside a long
+   * dialog, failed in complete silence.
+   */
+  useEffect(() => {
+    const onToast = (event: Event) => {
+      const detail = (event as CustomEvent).detail as {
+        title: string;
+        body?: string;
+        tone?: Tone;
+      };
+      toast(detail.title, { body: detail.body, tone: detail.tone });
+    };
+    document.addEventListener(TOAST_EVENT, onToast);
+    return () => document.removeEventListener(TOAST_EVENT, onToast);
+  }, [toast]);
 
   return (
     <ToastContext.Provider value={value}>

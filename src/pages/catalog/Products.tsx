@@ -14,6 +14,7 @@ import {
   Table,
   useDebounced,
 } from "../../components/ui";
+import { ActiveFilters, SearchField, Segmented } from "../../components/filters";
 import { humanise } from "../../lib/format";
 import type { Category, ProductListItem, ProductType } from "../../lib/types";
 
@@ -24,6 +25,14 @@ const TYPES: ProductType[] = [
   "apparel",
   "hardware",
   "electronics",
+];
+
+/** Few enough to show them all, so they are shown rather than hidden. */
+const STATUSES = [
+  { value: "", label: "All" },
+  { value: "active", label: "Active" },
+  { value: "draft", label: "Draft" },
+  { value: "discontinued", label: "Discontinued" },
 ];
 
 /**
@@ -46,6 +55,18 @@ export function Products() {
 
   const debounced = useDebounced(search);
   const categories = useApi<Category[]>(["catalog", "categories"], "/catalog/categories");
+
+  // The chip shows the category's NAME; the filter is keyed on its path.
+  const categoryLabel =
+    (categories.data ?? []).find((category) => category.path === categoryPath)?.name ?? "";
+
+  function clearFilters() {
+    setSearch("");
+    setCategoryPath("");
+    setProductType("");
+    setStatus("");
+    setOffset(0);
+  }
 
   const products = useApiList<ProductListItem>(["catalog", "products"], "/catalog/products", {
     search: debounced || undefined,
@@ -71,16 +92,14 @@ export function Products() {
       />
 
       <div className="filters">
-        <Field label="Search">
-          <input
-            value={search}
-            placeholder="Name, code or SKU"
-            onChange={(e) => {
-              setSearch(e.target.value);
-              setOffset(0);
-            }}
-          />
-        </Field>
+        <SearchField
+          value={search}
+          placeholder="Name, code or SKU"
+          onChange={(value) => {
+            setSearch(value);
+            setOffset(0);
+          }}
+        />
 
         <Field label="Category">
           <select
@@ -117,21 +136,60 @@ export function Products() {
           </select>
         </Field>
 
-        <Field label="Status">
-          <select
-            value={status}
-            onChange={(e) => {
-              setStatus(e.target.value);
-              setOffset(0);
-            }}
-          >
-            <option value="">All</option>
-            <option value="active">Active</option>
-            <option value="draft">Draft</option>
-            <option value="discontinued">Discontinued</option>
-          </select>
-        </Field>
+        {/* Four options, all worth seeing. A select would hide three of them
+            behind a click and tell you nothing you did not already know. */}
+        <Segmented
+          label="Status"
+          value={status}
+          options={STATUSES}
+          onChange={(value) => {
+            setStatus(value);
+            setOffset(0);
+          }}
+        />
       </div>
+
+      {/*
+        * Why the list is this short.
+        *
+        * Without this, a catalogue of 4,318 products showing twelve rows looks
+        * exactly like a catalogue of twelve products, and the only way to find
+        * out otherwise is to scroll back up and read four controls. Each chip
+        * names the filter and carries its own undo.
+        */}
+      <ActiveFilters
+        total={products.data?.total ?? null}
+        showing={products.data?.items.length ?? 0}
+        noun="products"
+        onClearAll={clearFilters}
+        filters={[
+          { key: "Search", value: search, onClear: () => setSearch("") },
+          {
+            key: "Category",
+            value: categoryLabel,
+            onClear: () => {
+              setCategoryPath("");
+              setOffset(0);
+            },
+          },
+          {
+            key: "Type",
+            value: productType ? humanise(productType) : "",
+            onClear: () => {
+              setProductType("");
+              setOffset(0);
+            },
+          },
+          {
+            key: "Status",
+            value: status ? humanise(status) : "",
+            onClear: () => {
+              setStatus("");
+              setOffset(0);
+            },
+          },
+        ]}
+      />
 
       <Card flush>
         <QueryState

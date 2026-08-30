@@ -65,6 +65,58 @@ export function PageHead({
   );
 }
 
+/**
+ * One figure and what it means.
+ *
+ * Every screen was writing this out by hand — `<Card><div className="stat">`
+ * with a label div and a value div — which is why the figure sizes had drifted
+ * apart and why not one of the twenty-odd tiles in the app carried an icon.
+ *
+ * `tone` colours the rail and the icon chip together, so a card that needs
+ * attention is identifiable from across the room without a word being read. It
+ * is never the only signal: the label says what the figure is, and the hint
+ * says why it is that colour.
+ */
+export function Stat({
+  label,
+  value,
+  hint,
+  icon,
+  tone = "neutral",
+  trailing,
+  children,
+}: {
+  label: ReactNode;
+  value: ReactNode;
+  hint?: ReactNode;
+  icon?: ReactNode;
+  /** Colours the leading rail and the icon chip. */
+  tone?: "neutral" | "info" | "good" | "attention" | "critical";
+  /** Sits on the figure's baseline — a delta, a unit, a share. */
+  trailing?: ReactNode;
+  /** Anything below the hint. A sparkline, usually. */
+  children?: ReactNode;
+}) {
+  return (
+    <div className={tone === "neutral" ? "stat" : `stat ${tone}`}>
+      <div className="stat-head">
+        {icon ? (
+          <span className="stat-icon" aria-hidden>
+            {icon}
+          </span>
+        ) : null}
+        <span className="label">{label}</span>
+      </div>
+      <div className="stat-value-row">
+        <span className="value">{value}</span>
+        {trailing}
+      </div>
+      {hint ? <div className="hint">{hint}</div> : null}
+      {children}
+    </div>
+  );
+}
+
 export function Badge({
   tone = "neutral",
   children,
@@ -297,6 +349,7 @@ export function ConfirmButton({
   danger,
   disabled,
   pending,
+  triggerClassName,
   children,
 }: {
   label: string;
@@ -307,26 +360,54 @@ export function ConfirmButton({
   danger?: boolean;
   disabled?: boolean;
   pending?: boolean;
+  /**
+   * Overrides the trigger's classes. A row action wants a quiet
+   * `"sm subtle-danger"`; a page-level destructive action wants the default
+   * filled button. The dialog is identical either way.
+   */
+  triggerClassName?: string;
   children?: ReactNode;
 }) {
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [failure, setFailure] = useState<unknown>(null);
 
   async function run() {
     setBusy(true);
+    setFailure(null);
     try {
       await onConfirm();
       setOpen(false);
+    } catch (error) {
+      /*
+       * Stay open, and say why.
+       *
+       * The server refuses a destructive action for a reason it states
+       * precisely — "40 still on hand, sell or write it off first", "3 products
+       * are still in this category". That sentence is the whole answer, and it
+       * belongs in the dialog the user is looking at rather than only in a
+       * toast that slides away after five seconds.
+       *
+       * Closing on failure would drop them back to an unchanged list with no
+       * explanation, which reads as the button not working.
+       */
+      setFailure(error);
     } finally {
       setBusy(false);
     }
+  }
+
+  function close() {
+    setOpen(false);
+    // A stale refusal must not greet the next attempt.
+    setFailure(null);
   }
 
   return (
     <>
       <button
         type="button"
-        className={danger ? "danger" : "primary"}
+        className={triggerClassName ?? (danger ? "danger" : "primary")}
         onClick={() => setOpen(true)}
         disabled={disabled || pending}
       >
@@ -337,23 +418,35 @@ export function ConfirmButton({
         <Modal
           narrow
           title={title ?? label}
-          onClose={() => !busy && setOpen(false)}
+          onClose={() => !busy && close()}
           footer={
             <>
-              <button type="button" onClick={() => setOpen(false)} disabled={busy}>
-                Cancel
+              <button type="button" onClick={close} disabled={busy}>
+                {failure ? "Close" : "Cancel"}
               </button>
+              {/*
+                * A spinner in place of the label, not a label that changes.
+                *
+                * "Working..." is narrower than most confirm labels, so the
+                * button used to shrink at the exact moment somebody was looking
+                * to see whether their click had registered — and a control that
+                * moves under the cursor reads as a misfire. The button now
+                * keeps its size and spins in place.
+                */}
               <button
                 type="button"
-                className={danger ? "danger" : "primary"}
+                className={`${danger ? "danger" : "primary"}${busy ? " busy" : ""}`}
                 onClick={() => void run()}
                 disabled={busy}
               >
-                {busy ? "Working..." : confirmLabel}
+                {confirmLabel}
               </button>
             </>
           }
         >
+          {/* The refusal leads, because once there is one it is the only thing
+              worth reading in this dialog. */}
+          <ErrorBanner error={failure} />
           <p>{message}</p>
           {children}
         </Modal>

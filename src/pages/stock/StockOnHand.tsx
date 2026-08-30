@@ -13,6 +13,7 @@ import {
   Table,
   useDebounced,
 } from "../../components/ui";
+import { ActiveFilters } from "../../components/filters";
 import { date, daysUntil, money } from "../../lib/format";
 import { SkeletonStats } from "../../components/feedback";
 import { useUnits } from "../../lib/use-units";
@@ -62,7 +63,9 @@ export function StockOnHand() {
     0,
   );
 
-  const filtered = Boolean(search) || Boolean(locationId) || belowReorder || includeZero;
+  // The chip shows the location's NAME; the filter is keyed on its id.
+  const locationName =
+    (locations.data ?? []).find((location) => location.id === locationId)?.name ?? "";
 
   const clearFilters = () => {
     setSearch("");
@@ -194,12 +197,49 @@ export function StockOnHand() {
           Include zero balances
         </label>
 
-        {filtered ? (
-          <button type="button" className="ghost sm" onClick={clearFilters}>
-            Clear filters
-          </button>
-        ) : null}
       </div>
+
+      {/*
+        * Why this list is the length it is.
+        *
+        * "Clear filters" said that something was on without saying what, so the
+        * only way to find out which of four controls was narrowing the list was
+        * to read all four. Each chip names its filter and carries its own undo,
+        * and the count says how much is being hidden.
+        */}
+      <ActiveFilters
+        total={balances.data?.total ?? null}
+        showing={balances.data?.items.length ?? 0}
+        noun="lines"
+        onClearAll={clearFilters}
+        filters={[
+          { key: "Search", value: search, onClear: () => setSearch("") },
+          {
+            key: "Location",
+            value: locationName,
+            onClear: () => {
+              setLocationId("");
+              setOffset(0);
+            },
+          },
+          {
+            key: "Only",
+            value: belowReorder ? "below reorder point" : "",
+            onClear: () => {
+              setBelowReorder(false);
+              setOffset(0);
+            },
+          },
+          {
+            key: "Including",
+            value: includeZero ? "zero balances" : "",
+            onClear: () => {
+              setIncludeZero(false);
+              setOffset(0);
+            },
+          },
+        ]}
+      />
 
       <Card flush>
         <QueryState

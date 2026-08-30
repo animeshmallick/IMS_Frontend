@@ -16,6 +16,7 @@ import {
   Table,
   TextField,
 } from "../../components/ui";
+import { Segmented } from "../../components/filters";
 import { VariantPicker } from "../../components/VariantPicker";
 import { api } from "../../lib/api";
 import { date, humanise, money, multiplyMoney, qty, statusTone, sumMoney } from "../../lib/format";
@@ -147,22 +148,23 @@ export function SupplierReturns() {
       ) : null}
 
       <div className="filters">
-        <Field label="Status">
-          <select
-            value={status}
-            onChange={(e) => {
-              setStatus(e.target.value);
-              setOffset(0);
-            }}
-          >
-            <option value="">All statuses</option>
-            {["draft", "posted", "rejected", "cancelled"].map((s) => (
-              <option key={s} value={s}>
-                {humanise(s)}
-              </option>
-            ))}
-          </select>
-        </Field>
+        {/* Four statuses is few enough to show them all. A select would hide
+            three of them behind a click and say nothing in exchange. */}
+        <Segmented
+          label="Status"
+          value={status}
+          options={[
+            { value: "", label: "All" },
+            { value: "draft", label: "Draft" },
+            { value: "posted", label: "Posted" },
+            { value: "rejected", label: "Rejected" },
+            { value: "cancelled", label: "Cancelled" },
+          ]}
+          onChange={(value) => {
+            setStatus(value);
+            setOffset(0);
+          }}
+        />
         <label className="check">
             <input
               type="checkbox"

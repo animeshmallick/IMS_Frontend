@@ -1,11 +1,44 @@
+import { lazy, Suspense, useMemo } from "react";
 import { Link } from "react-router-dom";
 import { useApi } from "../lib/hooks";
 import { useSessionContext } from "../lib/session";
-import { Card, Empty, PageHead, QueryState, Table, Badge } from "../components/ui";
+import { Card, Empty, PageHead, QueryState, Stat, Table, Badge } from "../components/ui";
 import { SkeletonStats } from "../components/feedback";
-import { Clock, type LucideIcon, PackageSearch, Truck } from "lucide-react";
-import { money, qty, date, daysUntil } from "../lib/format";
-import type { DashboardTotals, ExpiringBatch, InTransitRow, ReorderRow } from "../lib/types";
+import {
+  Clock,
+  IndianRupee,
+  type LucideIcon,
+  PackageSearch,
+  Percent,
+  Receipt,
+  TrendingUp,
+  Truck,
+} from "lucide-react";
+import { money, qty, date, daysUntil, toDateInput } from "../lib/format";
+import type { TrendPoint } from "./DashboardCharts";
+
+/*
+ * The charts are fetched only by people who can see money.
+ *
+ * This is the landing route — everybody arrives here, the cashier included —
+ * and the charting library is ~115 KB gzipped. A static import would post that
+ * download to every till in the business in order to render nothing, since the
+ * cards below are already behind `report:financial`. Lazily imported, the
+ * download follows the permission.
+ */
+const TakingsTrend = lazy(async () => ({
+  default: (await import("./DashboardCharts")).TakingsTrend,
+}));
+const TakingsSpark = lazy(async () => ({
+  default: (await import("./DashboardCharts")).TakingsSpark,
+}));
+import type {
+  DashboardTotals,
+  ExpiringBatch,
+  InTransitRow,
+  ReorderRow,
+  SalesSummaryRow,
+} from "../lib/types";
 
 /**
  * The opening screen.
@@ -41,6 +74,40 @@ export function Dashboard() {
 
   const showMoney = can("report:financial");
 
+  /*
+   * The last fortnight of takings.
+   *
+   * "Today's sales: ₹18,420" is a number without a scale — good day, bad day,
+   * Tuesday? The trend answers that in the same glance, and fourteen days is
+   * the shortest window that shows two of every weekday, so a quiet Monday
+   * reads as a Monday rather than as a problem.
+   */
+  const fortnightStart = new Date();
+  fortnightStart.setDate(fortnightStart.getDate() - 13);
+
+  const recent = useApi<SalesSummaryRow[]>(
+    ["reports", "sales-summary", "dashboard"],
+    "/reports/sales-summary",
+    { from: toDateInput(fortnightStart), to: toDateInput(new Date()), locationId },
+    { enabled: showMoney, staleTime: 300_000 },
+  );
+
+  /*
+   * Recharts wants numbers; the API sends `numeric` columns as strings, because
+   * turning them into floats is precisely what the backend avoids. Parsing here
+   * is safe: this copy is only ever drawn, never sent back, and every figure the
+   * user reads still comes from the untouched string.
+   */
+  const trend = useMemo<TrendPoint[]>(
+    () =>
+      (recent.data ?? []).map((row) => ({
+        day: row.day,
+        revenue: Number(row.revenue),
+        margin: Number(row.margin),
+      })),
+    [recent.data],
+  );
+
   const expiringCount = expiring.data?.length ?? 0;
   const reorderCount = reorder.data?.length ?? 0;
   const inTransitCount = inTransit.data?.length ?? 0;
@@ -61,32 +128,55 @@ export function Dashboard() {
       {can("report:operational") && totals.data ? (
         <div className="grid cols-4 mb">
           <Card>
-            <div className="stat">
-              <div className="label">Today's bills</div>
-              <div className="value">{totals.data.today.orders}</div>
-            </div>
+            <Stat
+              icon={<Receipt size={13} aria-hidden />}
+              label="Today's bills"
+              value={totals.data.today.orders}
+            />
           </Card>
           {showMoney ? (
             <>
               <Card>
-                <div className="stat">
-                  <div className="label">Today's sales</div>
-                  <div className="value">{money(totals.data.today.revenue)}</div>
-                  <div className="hint">Margin {money(totals.data.today.margin)}</div>
-                </div>
+                <Stat
+                  icon={<IndianRupee size={13} aria-hidden />}
+                  tone="info"
+                  label="Today's sales"
+                  value={money(totals.data.today.revenue)}
+                  hint={`Margin ${money(totals.data.today.margin)}`}
+                />
               </Card>
               <Card>
-                <div className="stat">
-                  <div className="label">This month</div>
-                  <div className="value">{money(totals.data.monthToDate.revenue)}</div>
-                  <div className="hint">{totals.data.monthToDate.orders} bills</div>
-                </div>
+                <Stat
+                  icon={<TrendingUp size={13} aria-hidden />}
+                  tone="good"
+                  label="This month"
+                  value={money(totals.data.monthToDate.revenue)}
+                  hint={`${totals.data.monthToDate.orders} bills`}
+                >
+                  {/* Shape only — no axes, no labels. The figure above is the
+                      value; this says how it got there. Nothing is shown while
+                      it loads: a 30px placeholder under a stat is more
+                      distracting than the half-second of nothing it replaces. */}
+                  <Suspense fallback={null}>
+                    <TakingsSpark data={trend} />
+                  </Suspense>
+                </Stat>
               </Card>
               <Card>
-                <div className="stat">
-                  <div className="label">Month margin</div>
-                  <div className="value">{money(totals.data.monthToDate.margin)}</div>
-                </div>
+                <Stat
+                  icon={<Percent size={13} aria-hidden />}
+                  label="Month margin"
+                  value={money(totals.data.monthToDate.margin)}
+                  hint={
+                    Number(totals.data.monthToDate.revenue) > 0
+                      ? `${(
+                          (Number(totals.data.monthToDate.margin) /
+                            Number(totals.data.monthToDate.revenue)) *
+                          100
+                        ).toFixed(1)}% of revenue`
+                      : undefined
+                  }
+                />
               </Card>
             </>
           ) : null}
@@ -124,6 +214,20 @@ export function Dashboard() {
             to="/transfers"
           />
         </div>
+      ) : null}
+
+      {/*
+        * Trading, at the scale a day is judged against.
+        *
+        * Placed under the attention strip rather than above it on purpose: the
+        * strip is what needs doing today, and this is context for it. Only for
+        * people who may see money at all, and only once there is enough of a
+        * series to have a shape.
+        */}
+      {showMoney && trend.length > 2 ? (
+        <Suspense fallback={null}>
+          <TakingsTrend data={trend} />
+        </Suspense>
       ) : null}
 
       <div className="grid cols-2">

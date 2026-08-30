@@ -27,24 +27,58 @@ const REASONS = [
  * permissions held by different people, and the database refuses to let one
  * person do both.
  */
+/**
+ * The views that correspond to a decision.
+ *
+ * "Waiting on you" leads deliberately: an adjustment sitting unapproved is
+ * stock the books still claim exists, and this is the one screen where a
+ * backlog has an accounting consequence rather than merely an operational one.
+ */
+const VIEWS: { key: string; label: string; statuses?: string[] }[] = [
+  { key: "todo", label: "Awaiting approval", statuses: ["pending_approval"] },
+  { key: "open", label: "In progress", statuses: ["draft", "approved"] },
+  { key: "done", label: "Posted", statuses: ["posted"] },
+  { key: "all", label: "All" },
+];
+
 export function Adjustments() {
   const navigate = useNavigate();
   const { can } = useSessionContext();
-  const [status, setStatus] = useState("");
+  const [view, setView] = useState("todo");
   const [reason, setReason] = useState("");
   const [offset, setOffset] = useState(0);
   const limit = 25;
 
-  const adjustments = useApiList<AdjustmentListItem>(["adjustments"], "/stock-adjustments", {
-    status: status || undefined,
+  const current = VIEWS.find((v) => v.key === view) ?? VIEWS[3]!;
+
+  const adjustments = useApiList<AdjustmentListItem>(["adjustments", view], "/stock-adjustments", {
+    status: current.statuses?.join(",") || undefined,
     reason: reason || undefined,
     limit,
     offset,
   });
 
-  const awaitingApproval = (adjustments.data?.items ?? []).filter(
-    (a) => a.status === "pending_approval",
-  ).length;
+  const select = (key: string) => {
+    setView(key);
+    setOffset(0);
+  };
+
+  /*
+   * How many are genuinely waiting, not how many are waiting on this page.
+   *
+   * Counting the rows in hand was near enough when the list was unfiltered and
+   * short, but it is a page of at most 25 — so a real backlog of 60 reported
+   * itself as 25, and with the "Awaiting approval" view selected it would
+   * report the page size back as though it were the answer. A one-row request
+   * for the envelope's total costs a query and is actually true.
+   */
+  const pending = useApiList<AdjustmentListItem>(
+    ["adjustments", "pending-count"],
+    "/stock-adjustments",
+    { status: "pending_approval", limit: 1, offset: 0 },
+    { enabled: can("stock:adjust_approve") },
+  );
+  const awaitingApproval = pending.data?.total ?? 0;
 
   return (
     <>
@@ -66,24 +100,27 @@ export function Adjustments() {
         </div>
       ) : null}
 
-      <div className="filters">
-        <Field label="Status">
-          <select
-            value={status}
-            onChange={(e) => {
-              setStatus(e.target.value);
-              setOffset(0);
-            }}
-          >
-            <option value="">All statuses</option>
-            {["draft", "pending_approval", "approved", "posted", "rejected", "cancelled"].map((s) => (
-              <option key={s} value={s}>
-                {humanise(s)}
-              </option>
-            ))}
-          </select>
-        </Field>
+      <div className="mb">
+        <div className="seg" role="tablist" aria-label="Adjustment status">
+          {VIEWS.map((v) => (
+            <button
+              key={v.key}
+              type="button"
+              role="tab"
+              aria-selected={view === v.key}
+              className={view === v.key ? "active" : ""}
+              onClick={() => select(v.key)}
+            >
+              {v.label}
+              {v.key === "todo" && awaitingApproval > 0 ? (
+                <span className="count">{awaitingApproval}</span>
+              ) : null}
+            </button>
+          ))}
+        </div>
+      </div>
 
+      <div className="filters">
         <Field label="Reason">
           <select
             value={reason}

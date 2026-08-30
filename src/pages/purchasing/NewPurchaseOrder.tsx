@@ -12,17 +12,24 @@ import {
   SelectField,
 } from "../../components/ui";
 import { VariantPicker } from "../../components/VariantPicker";
-import { money, multiplyMoney, sumMoney } from "../../lib/format";
-import type { Location, Supplier, Uom, VariantSearchResult } from "../../lib/types";
+import { money, multiplyMoney, qty, sumMoney } from "../../lib/format";
+import type { Location, Supplier, VariantSearchResult } from "../../lib/types";
 
 interface DraftLine {
   variantId: string;
   sku: string;
   productName: string;
   stockUomCode: string;
+  stockUomId: string;
   orderUomId: string;
   orderQty: string;
   unitCost: string;
+  /**
+   * The units THIS SKU may be ordered in — its own stock unit, plus whatever
+   * conversions are configured for it. Carried per line because it is a
+   * property of the SKU, not of the order.
+   */
+  units: { uomId: string; uomCode: string; factorToStockUom: string }[];
 }
 
 /**
@@ -57,7 +64,6 @@ export function NewPurchaseOrder() {
     : (suppliers.data?.items ?? []);
 
   const locations = useApi<Location[]>(["locations"], "/locations");
-  const uoms = useApi<Uom[]>(["catalog", "uoms"], "/catalog/uoms");
 
   const create = useApiMutation<Record<string, unknown>, { id: string }>("/purchase-orders", {
     method: "POST",
@@ -69,7 +75,30 @@ export function NewPurchaseOrder() {
   function addVariant(variant: VariantSearchResult) {
     if (lines.some((line) => line.variantId === variant.variantId)) return;
 
-    const stockUom = (uoms.data ?? []).find((u) => u.code === variant.stockUomCode);
+    /*
+     * The stock unit always leads, then whatever this SKU has conversions for.
+     *
+     * The stock unit needs no conversion row — the server treats a document in
+     * it as a 1:1 and says so explicitly — so it is prepended rather than
+     * expected to appear in the configured list.
+     *
+     * `purpose` is not filtered on here. A unit configured for selling only is
+     * still a real packet size, and the server is the one that decides what a
+     * purchase may be raised in; hiding it would be this screen inventing a
+     * rule the API does not have.
+     */
+    const units = [
+      {
+        uomId: variant.stockUomId,
+        uomCode: variant.stockUomCode,
+        factorToStockUom: "1",
+      },
+      ...(variant.orderUnits ?? []).map((unit) => ({
+        uomId: unit.uomId,
+        uomCode: unit.uomCode,
+        factorToStockUom: unit.factorToStockUom,
+      })),
+    ];
 
     setLines((current) => [
       ...current,
@@ -78,9 +107,11 @@ export function NewPurchaseOrder() {
         sku: variant.sku,
         productName: variant.productName,
         stockUomCode: variant.stockUomCode,
-        orderUomId: stockUom?.id ?? "",
+        stockUomId: variant.stockUomId,
+        orderUomId: variant.stockUomId,
         orderQty: "1",
         unitCost: "0",
+        units,
       },
     ]);
   }
@@ -185,7 +216,8 @@ export function NewPurchaseOrder() {
           <VariantPicker onPick={addVariant} placeholder="Search a product to add" />
           <p className="small muted mt">
             Choose the unit you are BUYING in — a box, a case, a kilo. Stock is held in the
-            product's own unit and the conversion is applied for you.
+            product's own unit and the conversion is applied for you. Each line offers the pack
+            sizes set up for that SKU; add more from the product page.
           </p>
         </Card>
       </div>
@@ -220,17 +252,44 @@ export function NewPurchaseOrder() {
                   {line.sku}
                   <span className="sub">{line.productName}</span>
                 </td>
+                {/*
+                  * Only the units this SKU can actually be ordered in.
+                  *
+                  * This listed every unit in the system, so a box of bolts and
+                  * a litre were equally offered for a product measured in
+                  * pieces. Picking a unit with no conversion is not a warning
+                  * but a hard refusal from `resolveUomFactor` — after the whole
+                  * order had been filled in and submitted.
+                  *
+                  * The factor is in the label because it is the thing being
+                  * chosen: "box (100 pc)" says what one of them is, and the
+                  * quantity beside it stops meaning two different things.
+                  */}
                 <td>
                   <select
                     value={line.orderUomId}
                     onChange={(e) => patchLine(index, { orderUomId: e.target.value })}
                   >
-                    {(uoms.data ?? []).map((u) => (
-                      <option key={u.id} value={u.id}>
-                        {u.code} — {u.name}
+                    {line.units.map((unit) => (
+                      <option key={unit.uomId} value={unit.uomId}>
+                        {unit.uomCode}
+                        {unit.uomId === line.stockUomId
+                          ? " (stock unit)"
+                          : ` (${qty(unit.factorToStockUom)} ${line.stockUomCode})`}
                       </option>
                     ))}
                   </select>
+                  {/*
+                    * Said once, on the line that has nowhere else to go. A SKU
+                    * with no conversions can only be ordered in its own unit,
+                    * and the reason that dropdown has a single entry is not
+                    * otherwise discoverable.
+                    */}
+                  {line.units.length === 1 ? (
+                    <span className="sub">
+                      No pack sizes set — add one on the product to order in boxes or cases.
+                    </span>
+                  ) : null}
                 </td>
                 <td>
                   <input

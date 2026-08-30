@@ -4,6 +4,7 @@ import { useApi, useApiMutation } from "../../lib/hooks";
 import { useSessionContext } from "../../lib/session";
 import {
   Card,
+  ConfirmButton,
   Empty,
   ErrorBanner,
   Field,
@@ -76,13 +77,25 @@ export function Categories() {
                   <td className="small muted">{category.path}</td>
                   {can("catalog:write") ? (
                     <td className="right">
-                      <button
-                        type="button"
-                        className="ghost sm"
-                        onClick={() => setEditingCategory(category)}
-                      >
-                        Edit
-                      </button>
+                      <div className="btn-row end">
+                        <button
+                          type="button"
+                          className="ghost sm"
+                          onClick={() => setEditingCategory(category)}
+                        >
+                          Edit
+                        </button>
+                        {/* Archiving lived only inside the edit dialog, two
+                            clicks deep and invisible from the list. */}
+                        {can("catalog:archive") ? (
+                          <ArchiveRow
+                            path={`/catalog/categories/${category.id}`}
+                            label={category.name}
+                            what="category"
+                            note="It stops appearing when adding products, but old orders and reports keep showing it. Refused while any product or sub-category still depends on it."
+                          />
+                        ) : null}
+                      </div>
                     </td>
                   ) : null}
                 </tr>
@@ -108,13 +121,23 @@ export function Categories() {
                   <td className="small muted">{brand.manufacturer ?? "—"}</td>
                   {can("catalog:write") ? (
                     <td className="right">
-                      <button
-                        type="button"
-                        className="ghost sm"
-                        onClick={() => setEditingBrand(brand)}
-                      >
-                        Edit
-                      </button>
+                      <div className="btn-row end">
+                        <button
+                          type="button"
+                          className="ghost sm"
+                          onClick={() => setEditingBrand(brand)}
+                        >
+                          Edit
+                        </button>
+                        {can("catalog:archive") ? (
+                          <ArchiveRow
+                            path={`/catalog/brands/${brand.id}`}
+                            label={brand.name}
+                            what="brand"
+                            note="It stops appearing when adding products. Products already carrying it keep it. Refused while any product still uses it."
+                          />
+                        ) : null}
+                      </div>
                     </td>
                   ) : null}
                 </tr>
@@ -280,6 +303,48 @@ function BrandModal({ onClose, onDone }: { onClose: () => void; onDone: () => vo
         onChange={(e) => setManufacturer(e.target.value)}
       />
     </Modal>
+  );
+}
+
+/**
+ * Take a catalogue row out of use, from the list it is in.
+ *
+ * The same archive the edit dialogs have always carried, hoisted to where the
+ * row actually is. Both remain: this is for the row you can already see is
+ * wrong, the dialog's is for when you opened it to fix something and decided
+ * not to.
+ *
+ * Every one of these is refused by the server while something still depends on
+ * it, and the refusal names what — which is the useful half of the answer, and
+ * why the message is shown as the server wrote it.
+ */
+function ArchiveRow({
+  path,
+  label,
+  what,
+  note,
+}: {
+  path: string;
+  label: string;
+  what: string;
+  note: string;
+}) {
+  const archive = useApiMutation<undefined, unknown>(path, {
+    method: "DELETE",
+    invalidate: [["catalog"]],
+  });
+
+  return (
+    <ConfirmButton
+      label="Archive"
+      triggerClassName="sm subtle-danger"
+      danger
+      title={`Archive ${label}?`}
+      confirmLabel={`Archive this ${what}`}
+      pending={archive.isPending}
+      message={note}
+      onConfirm={() => archive.mutateAsync(undefined)}
+    />
   );
 }
 

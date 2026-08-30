@@ -38,13 +38,6 @@ export function NewProduct() {
   const [trackSerial, setTrackSerial] = useState(false);
   const [description, setDescription] = useState("");
 
-  const [sku, setSku] = useState("");
-  const [barcode, setBarcode] = useState("");
-  const [price, setPrice] = useState("");
-  const [mrp, setMrp] = useState("");
-  const [reorderPoint, setReorderPoint] = useState("");
-  const [reorderQty, setReorderQty] = useState("");
-  const [shelfLifeDays, setShelfLife] = useState("");
 
   // Type-specific mandatory fields.
   const [composition, setComposition] = useState("");
@@ -85,17 +78,19 @@ export function NewProduct() {
       ...(productType === "pharma"
         ? { pharma: { composition, drugSchedule, requiresPrescription: true } }
         : {}),
-      variants: [
-        {
-          sku: sku || undefined,
-          shelfLifeDays: shelfLifeDays ? Number(shelfLifeDays) : undefined,
-          reorderPoint: reorderPoint || undefined,
-          reorderQty: reorderQty || undefined,
-          price: price || undefined,
-          mrp: mrp || undefined,
-          barcodes: barcode ? [{ barcode, isPrimary: true }] : undefined,
-        },
-      ],
+      /*
+       * No SKUs. Not an empty one — none at all.
+       *
+       * The API no longer requires a variant, so this screen creates the
+       * PRODUCT and stops. Every SKU the product ever has, including its first,
+       * is created through the "Add a SKU" dialog on the product page, so there
+       * is exactly one form for the job and the first SKU is shaped like every
+       * one after it.
+       *
+       * `insertVariant` numbers from the count that already exists, so the
+       * first one added still takes the product code as its SKU — the same
+       * value this screen used to produce.
+       */
     });
   }
 
@@ -103,7 +98,7 @@ export function NewProduct() {
     <>
       <PageHead
         title="New product"
-        subtitle="One product, with its first sellable SKU"
+        subtitle="What the thing is and how it is counted — its SKUs come next"
         actions={
           <>
             <button type="button" onClick={() => navigate("/products")}>
@@ -122,6 +117,28 @@ export function NewProduct() {
       />
 
       <ErrorBanner error={create.error} />
+
+      {/*
+        * Says where the rest of the job happens.
+        *
+        * This screen used to carry a "First SKU" panel whose fields did not
+        * match the "Add a SKU" dialog — different labels, no variant name, and
+        * two fields that appeared nowhere else. Two forms for one concept meant
+        * the first SKU of a product was always shaped slightly differently from
+        * every SKU added after it. There is one SKU form now, and it is not
+        * this one; without a line saying so, the screen would look like it had
+        * simply lost a section.
+        */}
+      <div className="alert info">
+        <div>
+          <strong>SKUs come next</strong>
+          <div className="hint">
+            This creates the product only. On the next screen, add the SKUs it is actually stocked
+            and sold in — one for a plain item, or one per size or colour. The first takes the
+            product code as its SKU.
+          </div>
+        </div>
+      </div>
 
       <div className="grid cols-2">
         <Card title="What is it?">
@@ -245,57 +262,6 @@ export function NewProduct() {
         </Card>
       </div>
 
-      <Card title="First SKU">
-        <div className="grid cols-4">
-          <TextField
-            label="SKU"
-            help="Left blank, one is derived from the product code."
-            value={sku}
-            onChange={(e) => setSku(e.target.value.toUpperCase())}
-          />
-          <TextField
-            label="Barcode"
-            help="Scanned at the counter."
-            value={barcode}
-            onChange={(e) => setBarcode(e.target.value)}
-          />
-          <TextField
-            label="Selling price"
-            help="Per stock unit."
-            inputMode="decimal"
-            value={price}
-            onChange={(e) => setPrice(e.target.value)}
-          />
-          <TextField
-            label="MRP"
-            help="Selling above a recorded MRP is refused."
-            inputMode="decimal"
-            value={mrp}
-            onChange={(e) => setMrp(e.target.value)}
-          />
-          <TextField
-            label="Reorder point"
-            inputMode="decimal"
-            value={reorderPoint}
-            onChange={(e) => setReorderPoint(e.target.value)}
-          />
-          <TextField
-            label="Reorder quantity"
-            inputMode="decimal"
-            value={reorderQty}
-            onChange={(e) => setReorderQty(e.target.value)}
-          />
-          {trackExpiry ? (
-            <TextField
-              label="Shelf life (days)"
-              help="Lets an expiry be derived when the supplier prints only a manufacture date."
-              inputMode="numeric"
-              value={shelfLifeDays}
-              onChange={(e) => setShelfLife(e.target.value)}
-            />
-          ) : null}
-        </div>
-      </Card>
     </>
   );
 }

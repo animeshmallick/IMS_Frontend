@@ -3,11 +3,26 @@ import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useApi, useApiList } from "../../lib/hooks";
 import { useSessionContext } from "../../lib/session";
-import { Badge, Card, Empty, Field, PageHead, Pager, QueryState, Table } from "../../components/ui";
+import { Badge, Card, Empty, PageHead, Pager, QueryState, Table } from "../../components/ui";
 import { date, dateTime, humanise, qty, statusTone } from "../../lib/format";
 import type { InTransitRow, Location, TransferListItem } from "../../lib/types";
 
-const STATUSES = ["draft", "dispatched", "partially_received", "received", "closed", "cancelled"];
+/**
+ * The views that correspond to a decision, plus everything.
+ *
+ * Not one tab per status. Six statuses in a dropdown asks the reader to know
+ * the workflow before they can use the filter, and the question anybody
+ * actually arrives with is "what is on a van" or "what still needs sending" —
+ * neither of which is a single status. `statuses` goes to the API as a
+ * comma-separated list, so each view is one request rather than a client-side
+ * filter over a page of results that would silently lie about the count.
+ */
+const VIEWS: { key: string; label: string; statuses?: string[] }[] = [
+  { key: "moving", label: "On the road", statuses: ["dispatched", "partially_received"] },
+  { key: "todo", label: "Needs sending", statuses: ["draft"] },
+  { key: "done", label: "Completed", statuses: ["received", "closed"] },
+  { key: "all", label: "All" },
+];
 
 /**
  * Stock transfers between warehouses and stores.
@@ -20,16 +35,25 @@ const STATUSES = ["draft", "dispatched", "partially_received", "received", "clos
 export function Transfers() {
   const navigate = useNavigate();
   const { can, activeLocation } = useSessionContext();
-  const [status, setStatus] = useState("");
+  const [view, setView] = useState("moving");
   const [offset, setOffset] = useState(0);
   const limit = 25;
 
+  const current = VIEWS.find((v) => v.key === view) ?? VIEWS[3]!;
+
   const locations = useApi<Location[]>(["locations"], "/locations");
-  const transfers = useApiList<TransferListItem>(["transfers"], "/stock-transfers", {
-    status: status || undefined,
+  // Keyed on the view, so switching does not serve the previous view's rows
+  // from cache while the new ones load.
+  const transfers = useApiList<TransferListItem>(["transfers", view], "/stock-transfers", {
+    status: current.statuses?.join(",") || undefined,
     limit,
     offset,
   });
+
+  const select = (key: string) => {
+    setView(key);
+    setOffset(0);
+  };
 
   const inbound = useApi<InTransitRow[]>(
     ["transfers", "in-transit"],
@@ -85,23 +109,21 @@ export function Transfers() {
         </Card>
       ) : null}
 
-      <div className="filters">
-        <Field label="Status">
-          <select
-            value={status}
-            onChange={(e) => {
-              setStatus(e.target.value);
-              setOffset(0);
-            }}
-          >
-            <option value="">All statuses</option>
-            {STATUSES.map((s) => (
-              <option key={s} value={s}>
-                {humanise(s)}
-              </option>
-            ))}
-          </select>
-        </Field>
+      <div className="mb">
+        <div className="seg" role="tablist" aria-label="Transfer status">
+          {VIEWS.map((v) => (
+            <button
+              key={v.key}
+              type="button"
+              role="tab"
+              aria-selected={view === v.key}
+              className={view === v.key ? "active" : ""}
+              onClick={() => select(v.key)}
+            >
+              {v.label}
+            </button>
+          ))}
+        </div>
       </div>
 
       <Card flush>

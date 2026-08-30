@@ -1,54 +1,135 @@
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { MutationCache, QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Route, Routes } from "react-router-dom";
+import { lazy, type ComponentType } from "react";
 import { ApiError } from "./lib/api";
 import { SessionProvider, useSessionQuery } from "./lib/session";
 import { OfflineProvider } from "./lib/offline";
 import { SignIn } from "./pages/SignIn";
-import { ErrorBoundary, ToastProvider } from "./components/feedback";
+import { ErrorBoundary, pushToast, ToastProvider } from "./components/feedback";
 import { Shell } from "./components/Shell";
-import { Dashboard } from "./pages/Dashboard";
-import { StockOnHand } from "./pages/stock/StockOnHand";
-import { StockLedger } from "./pages/stock/StockLedger";
-import { SerialLookup } from "./pages/stock/SerialLookup";
-import { BarcodeSheet } from "./pages/catalog/BarcodeSheet";
-import { Labels } from "./pages/catalog/Labels";
-import { Units } from "./pages/admin/Units";
-import { Products } from "./pages/catalog/Products";
-import { ProductDetailPage } from "./pages/catalog/ProductDetail";
-import { NewProduct } from "./pages/catalog/NewProduct";
-import { Categories } from "./pages/catalog/Categories";
-import { Suppliers } from "./pages/partners/Suppliers";
-import { Customers } from "./pages/partners/Customers";
-import { PurchaseOrders } from "./pages/purchasing/PurchaseOrders";
-import { PurchaseOrderDetailPage } from "./pages/purchasing/PurchaseOrderDetail";
-import { NewPurchaseOrder } from "./pages/purchasing/NewPurchaseOrder";
-import { GoodsReceipts } from "./pages/purchasing/GoodsReceipts";
-import { GoodsReceiptDetailPage } from "./pages/purchasing/GoodsReceiptDetail";
-import { NewGoodsReceipt } from "./pages/purchasing/NewGoodsReceipt";
-import { SupplierReturns } from "./pages/purchasing/SupplierReturns";
-import { Transfers } from "./pages/transfers/Transfers";
-import { TransferDetailPage } from "./pages/transfers/TransferDetail";
-import { NewTransfer } from "./pages/transfers/NewTransfer";
-import { Adjustments } from "./pages/stock/Adjustments";
-import { NewAdjustment } from "./pages/stock/NewAdjustment";
-import { AdjustmentDetailPage } from "./pages/stock/AdjustmentDetail";
-import { StockCounts } from "./pages/stock/StockCounts";
-import { StockCountDetailPage } from "./pages/stock/StockCountDetail";
-import { Counter } from "./pages/counter/Counter";
-import { Bills } from "./pages/counter/Bills";
-import { BillDetailPage } from "./pages/counter/BillDetail";
-import { Shifts } from "./pages/counter/Shifts";
-import { Reports } from "./pages/reports/Reports";
-import { Insights } from "./pages/insights/Insights";
-import { Replenishment } from "./pages/insights/Replenishment";
-import { SystemHealth } from "./pages/admin/SystemHealth";
-import { Staff } from "./pages/admin/Staff";
-import { Roles } from "./pages/admin/Roles";
-import { LocationsAdmin } from "./pages/admin/Locations";
-import { AuditTrail } from "./pages/admin/Audit";
 import { RequirePermission } from "./components/RequirePermission";
 
+/*
+ * Screens are downloaded when they are opened, not when the app is.
+ *
+ * All thirty-nine were imported eagerly into a single bundle, so a cashier
+ * opening the till pulled down the whole administration suite, every report and
+ * the barcode generator before the first bill could be rung up — over the shop
+ * broadband this system actually runs on. Charting made it worse: a library
+ * three screens need was landing in the bundle all thirty-nine share.
+ *
+ * `lazy` gives each screen its own chunk and lets the bundler hoist what they
+ * have in common, so the till downloads the till.
+ *
+ * The bindings keep their original names, so every route below reads exactly as
+ * it did before.
+ */
+const page = <T extends Record<string, ComponentType<object>>>(
+  loader: () => Promise<T>,
+  name: keyof T & string,
+) => lazy(async () => ({ default: (await loader())[name]! }));
+
+const Dashboard = page(() => import("./pages/Dashboard"), "Dashboard");
+const StockOnHand = page(() => import("./pages/stock/StockOnHand"), "StockOnHand");
+const StockLedger = page(() => import("./pages/stock/StockLedger"), "StockLedger");
+const SerialLookup = page(() => import("./pages/stock/SerialLookup"), "SerialLookup");
+const BarcodeSheet = page(() => import("./pages/catalog/BarcodeSheet"), "BarcodeSheet");
+const Labels = page(() => import("./pages/catalog/Labels"), "Labels");
+const Units = page(() => import("./pages/admin/Units"), "Units");
+const Products = page(() => import("./pages/catalog/Products"), "Products");
+const ProductDetailPage = page(
+  () => import("./pages/catalog/ProductDetail"),
+  "ProductDetailPage",
+);
+const NewProduct = page(() => import("./pages/catalog/NewProduct"), "NewProduct");
+const Categories = page(() => import("./pages/catalog/Categories"), "Categories");
+const Suppliers = page(() => import("./pages/partners/Suppliers"), "Suppliers");
+const Customers = page(() => import("./pages/partners/Customers"), "Customers");
+const PurchaseOrders = page(() => import("./pages/purchasing/PurchaseOrders"), "PurchaseOrders");
+const PurchaseOrderDetailPage = page(
+  () => import("./pages/purchasing/PurchaseOrderDetail"),
+  "PurchaseOrderDetailPage",
+);
+const NewPurchaseOrder = page(
+  () => import("./pages/purchasing/NewPurchaseOrder"),
+  "NewPurchaseOrder",
+);
+const GoodsReceipts = page(() => import("./pages/purchasing/GoodsReceipts"), "GoodsReceipts");
+const GoodsReceiptDetailPage = page(
+  () => import("./pages/purchasing/GoodsReceiptDetail"),
+  "GoodsReceiptDetailPage",
+);
+const NewGoodsReceipt = page(
+  () => import("./pages/purchasing/NewGoodsReceipt"),
+  "NewGoodsReceipt",
+);
+const SupplierReturns = page(() => import("./pages/purchasing/SupplierReturns"), "SupplierReturns");
+const Transfers = page(() => import("./pages/transfers/Transfers"), "Transfers");
+const TransferDetailPage = page(
+  () => import("./pages/transfers/TransferDetail"),
+  "TransferDetailPage",
+);
+const NewTransfer = page(() => import("./pages/transfers/NewTransfer"), "NewTransfer");
+const Adjustments = page(() => import("./pages/stock/Adjustments"), "Adjustments");
+const NewAdjustment = page(() => import("./pages/stock/NewAdjustment"), "NewAdjustment");
+const AdjustmentDetailPage = page(
+  () => import("./pages/stock/AdjustmentDetail"),
+  "AdjustmentDetailPage",
+);
+const StockCounts = page(() => import("./pages/stock/StockCounts"), "StockCounts");
+const StockCountDetailPage = page(
+  () => import("./pages/stock/StockCountDetail"),
+  "StockCountDetailPage",
+);
+const Counter = page(() => import("./pages/counter/Counter"), "Counter");
+const Bills = page(() => import("./pages/counter/Bills"), "Bills");
+const BillDetailPage = page(() => import("./pages/counter/BillDetail"), "BillDetailPage");
+const Shifts = page(() => import("./pages/counter/Shifts"), "Shifts");
+const Reports = page(() => import("./pages/reports/Reports"), "Reports");
+const Insights = page(() => import("./pages/insights/Insights"), "Insights");
+const Replenishment = page(() => import("./pages/insights/Replenishment"), "Replenishment");
+const SystemHealth = page(() => import("./pages/admin/SystemHealth"), "SystemHealth");
+const Staff = page(() => import("./pages/admin/Staff"), "Staff");
+const Roles = page(() => import("./pages/admin/Roles"), "Roles");
+const LocationsAdmin = page(() => import("./pages/admin/Locations"), "LocationsAdmin");
+const AuditTrail = page(() => import("./pages/admin/Audit"), "AuditTrail");
+
 const queryClient = new QueryClient({
+  /*
+   * Every failed mutation says so, on every screen.
+   *
+   * Screens report their own failures with an <ErrorBanner>, which is the right
+   * place for the detail — but it depends on each screen remembering, and on the
+   * banner being IN VIEW. Inside a tall dialog it is not: the button is at the
+   * bottom, the banner renders at the top, and scanning a barcode that is
+   * already on another SKU looked exactly like nothing happening at all.
+   *
+   * This is the floor under that. The banners stay; this guarantees no failure
+   * is silent, whatever screen it came from.
+   */
+  mutationCache: new MutationCache({
+    onError: (error) => {
+      // The server writes these to be read by the person who hit them —
+      // "This barcode is already assigned to another product", not a status
+      // code. Anything unrecognised still gets a sentence rather than nothing.
+      const message =
+        error instanceof ApiError
+          ? error.message
+          : error instanceof Error
+            ? error.message
+            : "Something went wrong.";
+
+      pushToast(message, {
+        tone: "error",
+        // Only for the genuinely unexplained: a reference nobody can act on is
+        // noise on a message that already says what to do.
+        body:
+          error instanceof ApiError && error.code === "INTERNAL_ERROR" && error.requestId
+            ? `Reference: ${error.requestId}`
+            : undefined,
+      });
+    },
+  }),
   defaultOptions: {
     queries: {
       refetchOnWindowFocus: false,

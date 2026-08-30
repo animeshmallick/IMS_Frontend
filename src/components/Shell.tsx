@@ -39,7 +39,7 @@ import {
   Wifi,
   WifiOff,
 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { Link, NavLink, Outlet, useLocation } from "react-router-dom";
 import { api } from "../lib/api";
 import { signOut } from "../lib/auth";
@@ -49,7 +49,7 @@ import { useOffline } from "../lib/offline";
 import { useSessionContext } from "../lib/session";
 import { useTheme } from "../lib/theme";
 import { CommandPalette, openCommandPalette } from "./CommandPalette";
-import { ErrorBoundary } from "./feedback";
+import { ErrorBoundary, SkeletonTable } from "./feedback";
 
 /**
  * Application shell: navigation, the working-location switcher, sign out.
@@ -299,7 +299,14 @@ export function Shell() {
           </NavLink>
 
           {groups.map((group) => (
-            <div key={group.heading}>
+            /*
+             * The group carries its hue; the links inherit it.
+             *
+             * Set as a data attribute rather than an inline style so the colour
+             * itself stays in the stylesheet with the rest of the palette — a
+             * theme swap moves it, and no screen holds a hex.
+             */
+            <div key={group.heading} className="nav-group" data-hue={group.heading.toLowerCase()}>
               <div className="sidebar-group">{group.heading}</div>
               {group.items.map((item) => (
                 <NavLink
@@ -485,7 +492,20 @@ export function Shell() {
            * subsequent page renders the failure of the one before it.
            */}
           <ErrorBoundary key={pathname}>
-            <Outlet />
+            {/*
+             * Screens arrive as their own chunk now, so there is a moment
+             * between the click and the render. A skeleton rather than a
+             * spinner, for the same reason every list uses one: it reserves the
+             * shape of what is coming, so the page does not jump when it lands
+             * and the eye is already where the first row will be.
+             *
+             * The boundary sits inside the shell, so the sidebar, the header
+             * and the location switcher never blink — only the region that is
+             * actually changing.
+             */}
+            <Suspense fallback={<SkeletonTable rows={8} />}>
+              <Outlet />
+            </Suspense>
           </ErrorBoundary>
         </main>
       </div>

@@ -103,7 +103,23 @@ export interface ProductVariantDetail {
   currentPrice: string | null;
   mrp: string | null;
   barcodes?: { id: string; barcode: string; type: string; packQty: string; isPrimary: boolean }[];
-  uomConversions?: { uomId: string; uomCode: string; factorToStockUom: string; purpose: string }[];
+  /**
+   * The units this SKU is bought and sold in, beyond the product's stock unit —
+   * a box of 100, a kilo where stock is counted in grams.
+   *
+   * `purpose` was typed as a bare string, which meant every reader had to cast
+   * it before it could be narrowed; it is one of three values and the API has
+   * always sent one of them. The two default flags are sent too and were simply
+   * missing here.
+   */
+  uomConversions?: {
+    uomId: string;
+    uomCode: string;
+    factorToStockUom: string;
+    purpose: "purchase" | "sale" | "both";
+    isDefaultPurchase?: boolean;
+    isDefaultSale?: boolean;
+  }[];
 }
 
 export interface ProductDetail {
@@ -128,18 +144,33 @@ export interface ProductDetail {
   variants: ProductVariantDetail[];
 }
 
+/** A unit a SKU may be bought or sold in, beyond its own stock unit. */
+export interface OrderUnit {
+  uomId: string;
+  uomCode: string;
+  /** How many stock units one of these is. A string, like every other numeric. */
+  factorToStockUom: string;
+  purpose: "purchase" | "sale" | "both";
+}
+
 export interface VariantSearchResult {
   variantId: string;
   sku: string;
   productName: string;
   variantName: string | null;
   stockUomCode: string;
+  stockUomId: string;
   isDivisible: boolean;
   trackExpiry: boolean;
   price: string | null;
   mrp: string | null;
   /** True when the term matched a barcode exactly — a scan, not a search. */
   exactBarcode: boolean;
+  /**
+   * The units this SKU can actually be transacted in. Empty is normal and
+   * means the stock unit only — the server needs no conversion row for that.
+   */
+  orderUnits: OrderUnit[];
 }
 
 /* --------------------------------------------------------------------- stock */

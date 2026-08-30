@@ -28,20 +28,41 @@ import { CycleCountPanel } from "./CycleCountPanel";
  * tells you nothing. The reveal is tied to the approval permission, not to a
  * toggle on this screen.
  */
+/**
+ * The views that correspond to a decision.
+ *
+ * A count in progress and a count awaiting review are two different jobs for
+ * two different people, and both were previously behind the same dropdown as
+ * "cancelled".
+ */
+const VIEWS: { key: string; label: string; statuses?: string[] }[] = [
+  { key: "open", label: "In progress", statuses: ["draft", "counting"] },
+  { key: "review", label: "Awaiting review", statuses: ["review"] },
+  { key: "done", label: "Posted", statuses: ["posted"] },
+  { key: "all", label: "All" },
+];
+
 export function StockCounts() {
   const navigate = useNavigate();
   const { can, activeLocation } = useSessionContext();
-  const [status, setStatus] = useState("");
+  const [view, setView] = useState("open");
   const [offset, setOffset] = useState(0);
   const [creating, setCreating] = useState(false);
   const [tab, setTab] = useState<"cycle" | "history">("cycle");
   const limit = 25;
 
-  const counts = useApiList<StockCountListItem>(["counts"], "/stock-counts", {
-    status: status || undefined,
+  const current = VIEWS.find((v) => v.key === view) ?? VIEWS[3]!;
+
+  const counts = useApiList<StockCountListItem>(["counts", view], "/stock-counts", {
+    status: current.statuses?.join(",") || undefined,
     limit,
     offset,
   });
+
+  const select = (key: string) => {
+    setView(key);
+    setOffset(0);
+  };
 
   return (
     <>
@@ -78,23 +99,21 @@ export function StockCounts() {
 
       {tab === "history" ? (
       <>
-      <div className="filters">
-        <Field label="Status">
-          <select
-            value={status}
-            onChange={(e) => {
-              setStatus(e.target.value);
-              setOffset(0);
-            }}
-          >
-            <option value="">All statuses</option>
-            {["draft", "counting", "review", "posted", "cancelled"].map((s) => (
-              <option key={s} value={s}>
-                {humanise(s)}
-              </option>
-            ))}
-          </select>
-        </Field>
+      <div className="mb">
+        <div className="seg" role="tablist" aria-label="Stock count status">
+          {VIEWS.map((v) => (
+            <button
+              key={v.key}
+              type="button"
+              role="tab"
+              aria-selected={view === v.key}
+              className={view === v.key ? "active" : ""}
+              onClick={() => select(v.key)}
+            >
+              {v.label}
+            </button>
+          ))}
+        </div>
       </div>
 
       <Card flush>

@@ -3,6 +3,7 @@ import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useApi, useApiList } from "../../lib/hooks";
 import { Badge, Card, Empty, Field, PageHead, Pager, QueryState, Table } from "../../components/ui";
+import { ActiveFilters } from "../../components/filters";
 import { dateTime, humanise, statusTone } from "../../lib/format";
 import type { GoodsReceiptListItem, Location } from "../../lib/types";
 
@@ -34,7 +35,9 @@ export function GoodsReceipts() {
 
   const items = receipts.data?.items ?? [];
   const drafts = items.filter((r) => r.status === "draft").length;
-  const filtered = Boolean(locationId) || draftsOnly;
+  // The chip shows the location's NAME; the filter is keyed on its id.
+  const locationName =
+    (locations.data ?? []).find((location) => location.id === locationId)?.name ?? "";
 
   const clear = () => {
     setLocationId("");
@@ -113,12 +116,34 @@ export function GoodsReceipts() {
           Drafts only
         </label>
 
-        {filtered ? (
-          <button type="button" className="ghost sm" onClick={clear}>
-            Clear filters
-          </button>
-        ) : null}
       </div>
+
+      {/* Each chip names its filter and carries its own undo, so "why is this
+          list short" and "make it stop" are in the same place. */}
+      <ActiveFilters
+        total={receipts.data?.total ?? null}
+        showing={items.length}
+        noun="deliveries"
+        onClearAll={clear}
+        filters={[
+          {
+            key: "Location",
+            value: locationName,
+            onClear: () => {
+              setLocationId("");
+              setOffset(0);
+            },
+          },
+          {
+            key: "Only",
+            value: draftsOnly ? "drafts" : "",
+            onClear: () => {
+              setDraftsOnly(false);
+              setOffset(0);
+            },
+          },
+        ]}
+      />
 
       <Card flush>
         <QueryState

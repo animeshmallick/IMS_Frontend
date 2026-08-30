@@ -1,9 +1,10 @@
 import { BarChart3 } from "lucide-react";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useApi } from "../../lib/hooks";
 import { useSessionContext } from "../../lib/session";
 import { Badge, Card, Empty, Field, PageHead, QueryState, Table } from "../../components/ui";
-import { date, humanise, money, qty, toDateInput } from "../../lib/format";
+import { CategoryChart, useChartPalette } from "../../components/charts";
+import { date, humanise, money, moneyCompact, qty, toDateInput } from "../../lib/format";
 import type { Location } from "../../lib/types";
 
 /**
@@ -116,6 +117,7 @@ export function Insights() {
 
   const query = { from, to, locationId: locationId || undefined };
   const locations = useApi<Location[]>(["locations"], "/locations");
+  const palette = useChartPalette();
 
   const suppliers = useApi<SupplierRow[]>(["insights", "suppliers"], "/insights/suppliers", query, {
     enabled: financial && tab === "suppliers",
@@ -147,6 +149,40 @@ export function Insights() {
     query,
     { enabled: tab === "trading" },
   );
+
+  /*
+   * Chart-shaped copies of two of the tabs.
+   *
+   * Numbers arrive as strings from `numeric` columns and stay strings
+   * everywhere they are read; these copies are parsed only to be drawn.
+   */
+  const tradingByHour = useMemo(
+    () =>
+      (trading.data ?? []).map((row) => ({
+        // "14:00" reads as an hour; the bare integer 14 reads as a quantity.
+        label: `${String(row.hour).padStart(2, "0")}:00`,
+        bills: row.bills,
+      })),
+    [trading.data],
+  );
+
+  const shrinkageByReason = useMemo(() => {
+    // Several locations can each contribute to the same reason, and the
+    // question here is which KIND of loss is expensive, not where it happened.
+    const totals = new Map<string, number>();
+    for (const row of shrink.data ?? []) {
+      totals.set(row.reason, (totals.get(row.reason) ?? 0) + Number(row.costImpact));
+    }
+    return [...totals.entries()]
+      .map(([reason, cost]) => ({
+        reason: humanise(reason),
+        cost: Math.abs(cost),
+        // Recovered stock is not shrinkage, and must not be coloured as though
+        // it were: a good month would read as a bad one.
+        found: reason === "found",
+      }))
+      .sort((a, b) => b.cost - a.cost);
+  }, [shrink.data]);
 
   const tabs: { id: Tab; label: string; financial: boolean }[] = [
     { id: "suppliers", label: "Suppliers", financial: true },
@@ -341,6 +377,27 @@ export function Insights() {
             query={shrink}
             empty={<Empty icon={<BarChart3 size={14} aria-hidden />} title="No stock written off" hint="Nothing has been lost, damaged or expired in this period." />}
           >
+            {/*
+              * Which loss is the expensive one.
+              *
+              * "Found" is deliberately drawn in the success colour rather than
+              * the loss colour: it is stock coming back, and colouring a
+              * recovery as shrinkage is how a good month reads as a bad one.
+              */}
+            {financial && shrinkageByReason.length > 1 ? (
+              <CategoryChart
+                data={shrinkageByReason}
+                xKey="reason"
+                series={[{ key: "cost", label: "Cost impact", color: palette["--series-2"] }]}
+                format={(value) => moneyCompact(value)}
+                colorFor={(row) =>
+                  row.found ? palette["--series-3"] : palette["--series-2"]
+                }
+                size="sm"
+                horizontal
+                summary="Cost impact of stock written off, grouped by reason, listed in the table below."
+              />
+            ) : null}
             <Table
               head={
                 <tr>
@@ -566,6 +623,20 @@ export function Insights() {
       {tab === "trading" ? (
         <Card title="When the shop is busy" flush>
           <QueryState query={trading} empty={<Empty icon={<BarChart3 size={14} aria-hidden />} title="No sales in this period" />}>
+            {/*
+              * The shape of a trading day, which is the actual question: the
+              * per-row bars below compare each hour against the peak, but a
+              * column chart shows the two humps and the lull between them in
+              * one look — and that is what a rota is drawn from.
+              */}
+            <CategoryChart
+              data={tradingByHour}
+              xKey="label"
+              series={[{ key: "bills", label: "Bills", color: palette["--series-1"] }]}
+              format={(value) => String(value)}
+              size="sm"
+              summary="Bills taken in each hour of the day, listed in the table below."
+            />
             <Table
               head={
                 <tr>

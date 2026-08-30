@@ -22,6 +22,37 @@ export function money(value: string | number | null | undefined): string {
 }
 
 /**
+ * Money with the digits taken off, for chart axes and nothing else.
+ *
+ * A y-axis reading "₹1,20,000.00" four times over is 56px of tick label for a
+ * scale nobody reads precisely — the point of the axis is the order of
+ * magnitude, and the exact figure is in the tooltip and in the table below it.
+ * Indian grouping, so a lakh is a lakh rather than "₹120K".
+ */
+const MONEY_COMPACT = new Intl.NumberFormat("en-IN", {
+  style: "currency",
+  currency: "INR",
+  notation: "compact",
+  maximumFractionDigits: 1,
+});
+
+export function moneyCompact(value: string | number | null | undefined): string {
+  if (value === null || value === undefined || value === "") return "—";
+  const n = typeof value === "number" ? value : Number(value);
+  if (!Number.isFinite(n)) return String(value);
+  // Below a thousand, compact notation gains nothing and loses the paisa.
+  return Math.abs(n) < 1000 ? MONEY.format(n) : MONEY_COMPACT.format(n);
+}
+
+/** A short axis label: "25 Aug", not "25 Aug 2026". The year is in the filter. */
+export function dateShort(value: string | Date | null | undefined): string {
+  if (!value) return "";
+  const d = typeof value === "string" ? new Date(value) : value;
+  if (Number.isNaN(d.getTime())) return "";
+  return d.toLocaleDateString("en-IN", { day: "2-digit", month: "short" });
+}
+
+/**
  * Quantities keep up to three decimals but drop trailing zeros: a shop selling
  * bolts wants "12", not "12.000", while one selling atta needs "0.25".
  */

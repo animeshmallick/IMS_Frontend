@@ -16,6 +16,7 @@ import {
   TextField,
   useDebounced,
 } from "../../components/ui";
+import { SearchField } from "../../components/filters";
 import type { Location, Role, StaffUser } from "../../lib/types";
 
 /**
@@ -62,16 +63,14 @@ export function Staff() {
       />
 
       <div className="filters">
-        <Field label="Search">
-          <input
-            value={search}
-            placeholder="Name, email or employee code"
-            onChange={(e) => {
-              setSearch(e.target.value);
-              setOffset(0);
-            }}
-          />
-        </Field>
+        <SearchField
+          value={search}
+          placeholder="Name, email or employee code"
+          onChange={(value) => {
+            setSearch(value);
+            setOffset(0);
+          }}
+        />
         <label className="check">
             <input
               type="checkbox"

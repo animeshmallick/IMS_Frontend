@@ -7,7 +7,6 @@ import {
   Card,
   Empty,
   ErrorBanner,
-  Field,
   Modal,
   PageHead,
   Pager,
@@ -16,6 +15,7 @@ import {
   TextField,
   useDebounced,
 } from "../../components/ui";
+import { SearchField } from "../../components/filters";
 import type { Supplier } from "../../lib/types";
 
 /** Who you buy from. */
@@ -48,16 +48,14 @@ export function Suppliers() {
       />
 
       <div className="filters">
-        <Field label="Search">
-          <input
-            value={search}
-            placeholder="Name or code"
-            onChange={(e) => {
-              setSearch(e.target.value);
-              setOffset(0);
-            }}
-          />
-        </Field>
+        <SearchField
+          value={search}
+          placeholder="Name or code"
+          onChange={(value) => {
+            setSearch(value);
+            setOffset(0);
+          }}
+        />
       </div>
 
       <Card flush>

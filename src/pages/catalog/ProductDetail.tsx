@@ -1,10 +1,13 @@
+import { Boxes } from "lucide-react";
 import { useState } from "react";
-import { useParams } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 import { useApi, useApiMutation } from "../../lib/hooks";
 import { useSessionContext } from "../../lib/session";
 import {
   Badge,
   Card,
+  ConfirmButton,
+  Empty,
   ErrorBanner,
   Field,
   Loading,
@@ -65,6 +68,10 @@ export function ProductDetailPage() {
                 </button>
               </>
             ) : null}
+            {/* Also inside "Edit product", where it has always been. Here too,
+                because this is the page you are on when you decide a product
+                should not exist. */}
+            {can("catalog:archive") ? <ArchiveProduct item={item} /> : null}
           </>
         }
       />
@@ -109,6 +116,29 @@ export function ProductDetailPage() {
       </div>
 
       <Card title={`SKUs (${item.variants.length})`} flush>
+        {/*
+          * A product with no SKUs is now a normal state rather than an
+          * impossible one: creating a product no longer invents a variant, so
+          * this is what every product looks like for the minute between being
+          * catalogued and being given the packet sizes it is stocked in.
+          *
+          * It is also the one state where the product cannot be sold at all, so
+          * the empty state says so plainly and offers the single next action.
+          */}
+        {item.variants.length === 0 ? (
+          <Empty
+            icon={<Boxes size={14} aria-hidden />}
+            title="No SKUs yet"
+            hint="A product needs at least one SKU before it can be priced, stocked or sold. Add one for a plain item, or one per size or colour."
+            action={
+              can("catalog:write") ? (
+                <button type="button" className="primary" onClick={() => setAddingSku(true)}>
+                  Add the first SKU
+                </button>
+              ) : null
+            }
+          />
+        ) : (
         <Table
           head={
             <tr>
@@ -117,6 +147,7 @@ export function ProductDetailPage() {
               <th className="num">Price</th>
               <th className="num">MRP</th>
               <th className="num">Reorder at</th>
+              <th>Units</th>
               <th>Barcodes</th>
               <th />
             </tr>
@@ -137,6 +168,49 @@ export function ProductDetailPage() {
               </td>
               <td className="num muted">{variant.mrp ? money(variant.mrp) : "—"}</td>
               <td className="num muted">{qty(variant.reorderPoint)}</td>
+              {/*
+                * The units this SKU is bought and sold in.
+                *
+                * The API has always returned `uomConversions` on every variant
+                * and the table never had a column for it, so a conversion could
+                * be saved and then never seen again — the dialog that set it
+                * showed only an empty form the next time it was opened, and the
+                * row gave no sign anything had been recorded. The value was
+                * making the whole round trip and being dropped on the floor.
+                *
+                * Read as "1 BOX = 100 g": the factor is meaningless without the
+                * stock unit beside it.
+                */}
+              <td className="small">
+                {(variant.uomConversions ?? []).map((conversion) => (
+                  <div key={conversion.uomId} className="nowrap">
+                    1 <strong>{conversion.uomCode}</strong>
+                    <span className="muted"> = </span>
+                    {qty(conversion.factorToStockUom)} {item.stockUomCode}
+                    {/* Only worth saying when it is NOT the default "both" —
+                        otherwise it is noise on every row. */}
+                    {conversion.purpose !== "both" ? (
+                      <span className="muted">
+                        {" "}
+                        · {conversion.purpose === "purchase" ? "buying" : "selling"}
+                      </span>
+                    ) : null}
+                  </div>
+                ))}
+                {(variant.uomConversions ?? []).length === 0 ? (
+                  can("catalog:write") ? (
+                    <button type="button" className="sm" onClick={() => setConverting(variant)}>
+                      Add a unit
+                    </button>
+                  ) : (
+                    <span className="muted">{item.stockUomCode} only</span>
+                  )
+                ) : can("catalog:write") ? (
+                  <button type="button" className="ghost sm" onClick={() => setConverting(variant)}>
+                    Manage
+                  </button>
+                ) : null}
+              </td>
               <td className="small">
                 {(variant.barcodes ?? []).map((barcode) => (
                   <div key={barcode.id} className="mono">
@@ -170,16 +244,27 @@ export function ProductDetailPage() {
                       Set price
                     </button>
                   ) : null}
-                  {can("catalog:write") ? (
-                    <button type="button" className="sm" onClick={() => setConverting(variant)}>
-                      Units
-                    </button>
+                  {/*
+                    * Archiving a SKU had an endpoint and no button anywhere in
+                    * the app, so a SKU added by mistake — a typo, a duplicate
+                    * size — was permanent.
+                    *
+                    * The server refuses while stock remains and says how much,
+                    * which is the useful answer; the dialog below says the same
+                    * thing up front so the refusal is rarely a surprise.
+                    */}
+                  {can("catalog:archive") ? (
+                    <ArchiveSku
+                      variant={variant}
+                      onDone={() => void product.refetch()}
+                    />
                   ) : null}
                 </div>
               </td>
             </tr>
           ))}
         </Table>
+        )}
       </Card>
 
       {item.description ? (
@@ -343,6 +428,31 @@ function UomModal({
 
   const uoms = useApi<Uom[]>(["catalog", "uoms"], "/catalog/uoms");
 
+  const existing = variant.uomConversions ?? [];
+
+  /*
+   * Choosing a unit that is already configured loads it rather than starting
+   * blank.
+   *
+   * The endpoint upserts on (variant, unit), so picking an existing unit was
+   * always going to overwrite it — but the form showed an empty factor, so the
+   * only clue was that the number you did not type replaced the one you had.
+   * Loading it turns a silent overwrite into a visible edit.
+   */
+  function chooseUom(nextId: string) {
+    setUomId(nextId);
+    const match = existing.find((conversion) => conversion.uomId === nextId);
+    if (match) {
+      setFactor(match.factorToStockUom);
+      setPurpose(match.purpose);
+    } else {
+      setFactor("");
+      setPurpose("both");
+    }
+  }
+
+  const editing = existing.some((conversion) => conversion.uomId === uomId);
+
   const save = useApiMutation<Record<string, unknown>, unknown>(
     `/catalog/variants/${variant.id}/uom-conversions`,
     { method: "PUT", invalidate: [["catalog"]], onSuccess: onDone },
@@ -372,21 +482,54 @@ function UomModal({
               })
             }
           >
-            {save.isPending ? "Saving..." : "Add unit"}
+            {save.isPending ? "Saving..." : editing ? "Update unit" : "Add unit"}
           </button>
         </>
       }
     >
       <ErrorBanner error={save.error} />
 
-      <Field label="Unit">
-        <select value={uomId} onChange={(e) => setUomId(e.target.value)}>
+      {/*
+        * What is already set.
+        *
+        * Without this the dialog was write-only: you could save a conversion,
+        * reopen the dialog and be shown the same empty form, with nothing
+        * anywhere confirming the earlier one had been recorded at all.
+        */}
+      {existing.length > 0 ? (
+        <Field label="Already set">
+          <div className="card">
+            <div className="card-body">
+              {existing.map((conversion) => (
+                <div key={conversion.uomId} className="spread small">
+                  <span>
+                    1 <strong>{conversion.uomCode}</strong>
+                    <span className="muted"> = </span>
+                    {qty(conversion.factorToStockUom)} {stockUomCode}
+                  </span>
+                  <span className="muted">
+                    {conversion.purpose === "both"
+                      ? "buying and selling"
+                      : conversion.purpose === "purchase"
+                        ? "buying"
+                        : "selling"}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </Field>
+      ) : null}
+
+      <Field label={existing.length > 0 ? "Add or change a unit" : "Unit"}>
+        <select value={uomId} onChange={(e) => chooseUom(e.target.value)}>
           <option value="">Choose a unit</option>
           {(uoms.data ?? [])
             .filter((u) => u.code !== stockUomCode)
             .map((u) => (
               <option key={u.id} value={u.id}>
                 {u.code} — {u.name}
+                {existing.some((conversion) => conversion.uomId === u.id) ? " (set)" : ""}
               </option>
             ))}
         </select>
@@ -755,6 +898,91 @@ function EditProduct({ item, onClose }: { item: ProductDetail; onClose: () => vo
 }
 
 /**
+ * Take the whole product, and every SKU under it, out of use.
+ *
+ * Refused while any stock remains anywhere across its SKUs — the server counts
+ * and says how much, which is the instruction; "cannot archive" would not be.
+ */
+function ArchiveProduct({ item }: { item: ProductDetail }) {
+  const navigate = useNavigate();
+
+  const archive = useApiMutation<undefined, unknown>(`/catalog/products/${item.id}`, {
+    method: "DELETE",
+    invalidate: [["catalog"]],
+    // The product this page is about no longer exists to show.
+    onSuccess: () => navigate("/products"),
+  });
+
+  return (
+    <ConfirmButton
+      label="Archive"
+      triggerClassName="subtle-danger"
+      danger
+      title={`Archive ${item.name}?`}
+      confirmLabel="Archive this product"
+      pending={archive.isPending}
+      message={
+        <>
+          This archives the product and all {item.variants.length} of its SKUs. They stop
+          appearing in search, at the counter and on new documents; bills, receipts and stock
+          movements that already reference them are unchanged.
+          <br />
+          <br />
+          This is refused while any stock remains against any of its SKUs.
+        </>
+      }
+      onConfirm={() => archive.mutateAsync(undefined)}
+    />
+  );
+}
+
+/**
+ * Take a SKU out of use.
+ *
+ * An archive, not a delete: the SKU is on old bills, receipts and every stock
+ * movement it ever made, so removing the row would leave those pointing at
+ * nothing. It stops appearing in search and at the counter; history keeps
+ * showing it.
+ *
+ * Refused while stock remains — the server checks and says how much, because
+ * "you still have 40 on hand" is an instruction and "cannot archive" is not.
+ */
+function ArchiveSku({
+  variant,
+  onDone,
+}: {
+  variant: ProductVariantDetail;
+  onDone: () => void;
+}) {
+  const archive = useApiMutation<undefined, unknown>(`/catalog/variants/${variant.id}`, {
+    method: "DELETE",
+    invalidate: [["catalog"]],
+    onSuccess: onDone,
+  });
+
+  return (
+    <ConfirmButton
+      label="Archive"
+      triggerClassName="sm subtle-danger"
+      danger
+      title={`Archive ${variant.sku}?`}
+      confirmLabel="Archive this SKU"
+      pending={archive.isPending}
+      message={
+        <>
+          It stops appearing in search, at the counter and on new documents. Bills and stock
+          movements that already reference it are unchanged.
+          <br />
+          <br />
+          This is refused while any stock remains against it.
+        </>
+      }
+      onConfirm={() => archive.mutateAsync(undefined)}
+    />
+  );
+}
+
+/**
  * Another SKU under the same product.
  *
  * A product is the thing; a SKU is the version you actually stock and sell —
@@ -773,6 +1001,15 @@ function AddSku({ item, onClose }: { item: ProductDetail; onClose: () => void })
   const [mrp, setMrp] = useState("");
   const [barcode, setBarcode] = useState("");
   const [reorderPoint, setReorderPoint] = useState("");
+  /*
+   * Reorder quantity and shelf life used to exist only on the create-product
+   * form, so they could be set for a product's first SKU and never for any
+   * other. Reorder quantity is not cosmetic: it feeds `suggestedQty` on the
+   * reorder report directly, so a SKU without one is suggested as zero on the
+   * dashboard and on the replenishment screen.
+   */
+  const [reorderQty, setReorderQty] = useState("");
+  const [shelfLifeDays, setShelfLife] = useState("");
   /** Stay open for the next one — sizes and colours arrive in runs. */
   const [addAnother, setAddAnother] = useState(true);
   const [added, setAdded] = useState<string[]>([]);
@@ -816,6 +1053,10 @@ function AddSku({ item, onClose }: { item: ProductDetail; onClose: () => void })
                 price: price.trim() || undefined,
                 mrp: mrp.trim() || undefined,
                 reorderPoint: reorderPoint.trim() || undefined,
+                reorderQty: reorderQty.trim() || undefined,
+                shelfLifeDays: shelfLifeDays.trim()
+                  ? Number(shelfLifeDays.trim())
+                  : undefined,
                 barcodes: barcode.trim()
                   ? [{ barcode: barcode.trim(), isPrimary: true }]
                   : undefined,
@@ -886,14 +1127,37 @@ function AddSku({ item, onClose }: { item: ProductDetail; onClose: () => void })
         help="Leave blank if the goods have not arrived yet — scan it when they do"
       />
 
-      <TextField
-        label={`Reorder point (${item.stockUomCode})`}
-        className="num"
-        inputMode="decimal"
-        value={reorderPoint}
-        onChange={(e) => setReorderPoint(e.target.value)}
-        help="Optional. Replenishment works it out from sales if left blank."
-      />
+      {/* A pair. The point is when to reorder, the quantity is how much —
+          splitting them across two screens is why one of them was never set. */}
+      <div className="grid cols-2">
+        <TextField
+          label={`Reorder point (${item.stockUomCode})`}
+          className="num"
+          inputMode="decimal"
+          value={reorderPoint}
+          onChange={(e) => setReorderPoint(e.target.value)}
+          help="Optional. Replenishment works it out from sales if left blank."
+        />
+        <TextField
+          label={`Reorder quantity (${item.stockUomCode})`}
+          className="num"
+          inputMode="decimal"
+          value={reorderQty}
+          onChange={(e) => setReorderQty(e.target.value)}
+          help="How much to buy when it drops. Drives the suggested quantity on the reorder report."
+        />
+      </div>
+
+      {item.trackExpiry ? (
+        <TextField
+          label="Typical shelf life (days)"
+          className="num"
+          inputMode="numeric"
+          value={shelfLifeDays}
+          onChange={(e) => setShelfLife(e.target.value)}
+          help="Optional. Lets an expiry be worked out when a supplier prints only a manufacture date."
+        />
+      ) : null}
 
       <label className="check mt">
         <input

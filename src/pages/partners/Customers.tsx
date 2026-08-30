@@ -6,13 +6,13 @@ import {
   Card,
   Empty,
   ErrorBanner,
-  Field,
   Modal,
   PageHead,
   Table,
   TextField,
   useDebounced,
 } from "../../components/ui";
+import { SearchField } from "../../components/filters";
 import { money } from "../../lib/format";
 import type { Customer } from "../../lib/types";
 
@@ -52,13 +52,11 @@ export function Customers() {
       />
 
       <div className="filters">
-        <Field label="Search">
-          <input
-            value={search}
-            placeholder="Phone number or name"
-            onChange={(e) => setSearch(e.target.value)}
-          />
-        </Field>
+        <SearchField
+          value={search}
+          placeholder="Phone number or name"
+          onChange={setSearch}
+        />
       </div>
 
       <Card flush>
