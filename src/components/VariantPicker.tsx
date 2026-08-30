@@ -1,8 +1,9 @@
 import { useState } from "react";
+import { api } from "../lib/api";
 import { useApi } from "../lib/hooks";
 import { useDebounced } from "./ui";
 import { money } from "../lib/format";
-import type { VariantSearchResult } from "../lib/types";
+import type { ScannedLabel, VariantSearchResult } from "../lib/types";
 
 /**
  * Find a SKU by name, code or barcode.
@@ -14,11 +15,20 @@ import type { VariantSearchResult } from "../lib/types";
  */
 export function VariantPicker({
   onPick,
+  onLabelScan,
   placeholder = "Search by name, SKU or barcode",
   autoFocus,
   showPrice = true,
 }: {
   onPick: (variant: VariantSearchResult) => void;
+  /**
+   * Called instead of `onPick` when the scan was an in-store weight label.
+   *
+   * Optional, so every other caller is unchanged: a purchase order line has no
+   * use for an embedded quantity, and should keep resolving scans the ordinary
+   * way.
+   */
+  onLabelScan?: (label: ScannedLabel) => void;
   placeholder?: string;
   autoFocus?: boolean;
   showPrice?: boolean;
@@ -38,6 +48,38 @@ export function VariantPicker({
     setTerm("");
   }
 
+  /*
+   * Try the in-store label first, and only if the digits could plausibly be
+   * one: thirteen of them, starting with the restricted-distribution prefix
+   * and a kind we issue. The cheap local test keeps an ordinary barcode from
+   * costing an extra round trip on every single scan at a busy till.
+   *
+   * The server is still the authority — it verifies the check digit and finds
+   * the SKU. A 204 means "not ours", and the caller falls through to the
+   * ordinary search, which is what makes one scan work for both kinds of code.
+   */
+  async function tryLabel(raw: string): Promise<boolean> {
+    if (!onLabelScan) return false;
+    if (!/^2[01]\d{11}$/.test(raw)) return false;
+
+    try {
+      const label = await api<ScannedLabel | null>("/catalog/labels/scan", {
+        query: { barcode: raw },
+      });
+      if (!label) return false;
+      onLabelScan(label);
+      setTerm("");
+      return true;
+    } catch {
+      /*
+       * A label whose PLU no longer exists throws. Returning false lets the
+       * ordinary search run and report nothing found, which is a better answer
+       * for a cashier holding a real bag than an error box with no next step.
+       */
+      return false;
+    }
+  }
+
   return (
     <div>
       <input
@@ -50,9 +92,14 @@ export function VariantPicker({
           // an exact barcode there is nothing to choose between, so take it.
           if (event.key !== "Enter") return;
           event.preventDefault();
-          const rows = results.data ?? [];
-          const exact = rows.find((r) => r.exactBarcode) ?? (rows.length === 1 ? rows[0] : undefined);
-          if (exact) pick(exact);
+
+          void (async () => {
+            if (await tryLabel(term.trim())) return;
+            const rows = results.data ?? [];
+            const exact =
+              rows.find((r) => r.exactBarcode) ?? (rows.length === 1 ? rows[0] : undefined);
+            if (exact) pick(exact);
+          })();
         }}
       />
 

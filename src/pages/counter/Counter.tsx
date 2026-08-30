@@ -341,6 +341,27 @@ export function Counter() {
                     const picked = fromSearchResult(variant);
                     return picked.isDivisible ? setWeighing(picked) : void addItem(picked);
                   }}
+                  onLabelScan={(label) => {
+                    /*
+                     * A printed label already carries the weight, so the
+                     * weighing dialog is skipped entirely. That is the point of
+                     * printing one: the bag was weighed once, at the scale, and
+                     * asking the cashier to key the same number again is both
+                     * slower and a second chance to get it wrong.
+                     */
+                    void addItem(
+                      {
+                        variantId: label.variantId,
+                        sku: label.sku,
+                        productName: label.productName,
+                        stockUomId: "",
+                        stockUomCode: label.stockUomCode,
+                        isDivisible: true,
+                        price: label.price,
+                      },
+                      label.qty,
+                    );
+                  }}
                   placeholder="Scan a barcode, or type a name or SKU"
                 />
               )}

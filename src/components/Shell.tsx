@@ -22,6 +22,7 @@ import {
   Package,
   PackageCheck,
   PackageMinus,
+  Printer,
   Receipt,
   RotateCcw,
   ScanLine,
@@ -124,6 +125,7 @@ const NAV: { heading: string; items: NavItem[] }[] = [
     items: [
       { to: "/products", label: "Products", icon: Package, anyOf: ["catalog:read"] },
       { to: "/categories", label: "Categories", icon: Tags, anyOf: ["catalog:read"] },
+      { to: "/labels", label: "Print Labels", icon: Printer, anyOf: ["catalog:read"] },
       { to: "/customers", label: "Customers", icon: Users, anyOf: ["customer:read"] },
     ],
   },

@@ -649,3 +649,22 @@ export interface TopProductRow {
   cost?: string;
   margin?: string;
 }
+
+/**
+ * A scanned in-store label: which SKU, and how much is in the bag.
+ *
+ * `qty` is a decimal STRING and must stay one — it came from a barcode and it
+ * is going into the ledger.
+ */
+export interface ScannedLabel {
+  variantId: string;
+  sku: string;
+  productName: string;
+  variantName: string | null;
+  stockUomCode: string;
+  qty: string;
+  /** Set when the label carried a price rather than a weight. */
+  embeddedPrice: string | null;
+  price: string | null;
+  mrp: string | null;
+}

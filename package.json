@@ -29,6 +29,7 @@
     "@tanstack/react-query": "^5.62.7",
     "better-auth": "^1.1.9",
     "cmdk": "^1.1.1",
+    "jsbarcode": "^3.12.3",
     "lucide-react": "^1.37.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",

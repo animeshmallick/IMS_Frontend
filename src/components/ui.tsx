@@ -23,14 +23,17 @@ export function Card({
   actions,
   children,
   flush,
+  className,
 }: {
   title?: ReactNode;
   actions?: ReactNode;
   children: ReactNode;
   flush?: boolean;
+  /** Spacing or layout from the caller. The card owns its own appearance. */
+  className?: string;
 }) {
   return (
-    <section className="card">
+    <section className={className ? `card ${className}` : "card"}>
       {title || actions ? (
         <header className="card-head">
           {typeof title === "string" ? <h2>{title}</h2> : title}
