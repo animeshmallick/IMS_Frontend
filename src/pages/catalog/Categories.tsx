@@ -26,6 +26,8 @@ export function Categories() {
   const { can } = useSessionContext();
   const [addingCategory, setAddingCategory] = useState(false);
   const [addingBrand, setAddingBrand] = useState(false);
+  const [editingCategory, setEditingCategory] = useState<Category | null>(null);
+  const [editingBrand, setEditingBrand] = useState<Brand | null>(null);
 
   const categories = useApi<Category[]>(["catalog", "categories"], "/catalog/categories");
   const brands = useApi<Brand[]>(["catalog", "brands"], "/catalog/brands");
@@ -60,6 +62,7 @@ export function Categories() {
                 <tr>
                   <th>Name</th>
                   <th>Path</th>
+                  {can("catalog:write") ? <th /> : null}
                 </tr>
               }
             >
@@ -70,6 +73,17 @@ export function Categories() {
                     {category.name}
                   </td>
                   <td className="small muted">{category.path}</td>
+                  {can("catalog:write") ? (
+                    <td className="right">
+                      <button
+                        type="button"
+                        className="ghost sm"
+                        onClick={() => setEditingCategory(category)}
+                      >
+                        Edit
+                      </button>
+                    </td>
+                  ) : null}
                 </tr>
               ))}
             </Table>
@@ -83,6 +97,7 @@ export function Categories() {
                 <tr>
                   <th>Name</th>
                   <th>Manufacturer</th>
+                  {can("catalog:write") ? <th /> : null}
                 </tr>
               }
             >
@@ -90,12 +105,45 @@ export function Categories() {
                 <tr key={brand.id}>
                   <td>{brand.name}</td>
                   <td className="small muted">{brand.manufacturer ?? "—"}</td>
+                  {can("catalog:write") ? (
+                    <td className="right">
+                      <button
+                        type="button"
+                        className="ghost sm"
+                        onClick={() => setEditingBrand(brand)}
+                      >
+                        Edit
+                      </button>
+                    </td>
+                  ) : null}
                 </tr>
               ))}
             </Table>
           </QueryState>
         </Card>
       </div>
+
+      {editingCategory ? (
+        <EditCategory
+          category={editingCategory}
+          onClose={() => setEditingCategory(null)}
+          onDone={() => {
+            setEditingCategory(null);
+            void categories.refetch();
+          }}
+        />
+      ) : null}
+
+      {editingBrand ? (
+        <EditBrand
+          brand={editingBrand}
+          onClose={() => setEditingBrand(null)}
+          onDone={() => {
+            setEditingBrand(null);
+            void brands.refetch();
+          }}
+        />
+      ) : null}
 
       {addingCategory ? (
         <CategoryModal
@@ -230,6 +278,169 @@ function BrandModal({ onClose, onDone }: { onClose: () => void; onDone: () => vo
         value={manufacturer}
         onChange={(e) => setManufacturer(e.target.value)}
       />
+    </Modal>
+  );
+}
+
+/**
+ * Rename a category, or take it out of use.
+ *
+ * "Delete" is an archive. A category is referenced by products, by old purchase
+ * orders and by every report ever run, so removing the row would leave those
+ * pointing at nothing — and a report from last quarter would quietly stop
+ * saying which part of the shop its numbers came from.
+ *
+ * The archive is refused while anything still depends on it, and the server
+ * says exactly what: how many products, or how many sub-categories. That
+ * message is the useful part, so it is shown as-is rather than replaced with
+ * something generic.
+ */
+function EditCategory({
+  category,
+  onClose,
+  onDone,
+}: {
+  category: Category;
+  onClose: () => void;
+  onDone: () => void;
+}) {
+  const [name, setName] = useState(category.name);
+
+  const save = useApiMutation<{ name: string }, unknown>(
+    `/catalog/categories/${category.id}`,
+    { method: "PATCH", invalidate: [["catalog", "categories"]], onSuccess: onDone },
+  );
+
+  const archive = useApiMutation<undefined, unknown>(`/catalog/categories/${category.id}`, {
+    method: "DELETE",
+    invalidate: [["catalog", "categories"]],
+    onSuccess: onDone,
+  });
+
+  return (
+    <Modal
+      title={`Edit ${category.name}`}
+      onClose={onClose}
+      footer={
+        <>
+          <button type="button" onClick={onClose}>
+            Cancel
+          </button>
+          <button
+            type="button"
+            className="primary"
+            disabled={!name.trim() || save.isPending}
+            onClick={() => save.mutate({ name: name.trim() })}
+          >
+            Save
+          </button>
+        </>
+      }
+    >
+      <ErrorBanner error={save.error ?? archive.error} />
+
+      <TextField label="Name" value={name} onChange={(e) => setName(e.target.value)} />
+
+      {/*
+        * The path is derived from the slug and the tree, so it is shown rather
+        * than edited: renaming is a label change, and quietly rewriting the
+        * path would move every product underneath it.
+        */}
+      <p className="hint mt">
+        Path <code>{category.path}</code>. Renaming changes the label only — to move it, change
+        its parent.
+      </p>
+
+      <hr />
+
+      <h3>Take out of use</h3>
+      <p className="hint">
+        It stops appearing when adding products, but old orders and reports keep showing it.
+        Refused while any product or sub-category still depends on it.
+      </p>
+      <button
+        type="button"
+        className="danger"
+        disabled={archive.isPending}
+        onClick={() => archive.mutate(undefined)}
+      >
+        Archive this category
+      </button>
+    </Modal>
+  );
+}
+
+/** The same for a brand: rename, change the manufacturer, or take it out of use. */
+function EditBrand({
+  brand,
+  onClose,
+  onDone,
+}: {
+  brand: Brand;
+  onClose: () => void;
+  onDone: () => void;
+}) {
+  const [name, setName] = useState(brand.name);
+  const [manufacturer, setManufacturer] = useState(brand.manufacturer ?? "");
+
+  const save = useApiMutation<{ name: string; manufacturer: string | null }, unknown>(
+    `/catalog/brands/${brand.id}`,
+    { method: "PATCH", invalidate: [["catalog", "brands"]], onSuccess: onDone },
+  );
+
+  const archive = useApiMutation<undefined, unknown>(`/catalog/brands/${brand.id}`, {
+    method: "DELETE",
+    invalidate: [["catalog", "brands"]],
+    onSuccess: onDone,
+  });
+
+  return (
+    <Modal
+      title={`Edit ${brand.name}`}
+      onClose={onClose}
+      footer={
+        <>
+          <button type="button" onClick={onClose}>
+            Cancel
+          </button>
+          <button
+            type="button"
+            className="primary"
+            disabled={!name.trim() || save.isPending}
+            onClick={() =>
+              save.mutate({ name: name.trim(), manufacturer: manufacturer.trim() || null })
+            }
+          >
+            Save
+          </button>
+        </>
+      }
+    >
+      <ErrorBanner error={save.error ?? archive.error} />
+
+      <TextField label="Name" value={name} onChange={(e) => setName(e.target.value)} />
+      <TextField
+        label="Manufacturer"
+        value={manufacturer}
+        placeholder="Optional"
+        onChange={(e) => setManufacturer(e.target.value)}
+      />
+
+      <hr />
+
+      <h3>Take out of use</h3>
+      <p className="hint">
+        Refused while any product still carries it. The brand stays readable on old documents,
+        so a purchase order from last year still shows the name it was raised with.
+      </p>
+      <button
+        type="button"
+        className="danger"
+        disabled={archive.isPending}
+        onClick={() => archive.mutate(undefined)}
+      >
+        Archive this brand
+      </button>
     </Modal>
   );
 }
