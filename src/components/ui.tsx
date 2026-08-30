@@ -101,11 +101,36 @@ export function ErrorBanner({ error }: { error: unknown }) {
   );
 }
 
-export function Empty({ title, hint }: { title: string; hint?: ReactNode }) {
+/**
+ * What a card shows when there is nothing in it.
+ *
+ * Compact and horizontal, not a centred block. "Nothing expiring" is a
+ * one-line answer, and giving it two hundred pixels of card makes an empty
+ * dashboard mostly empty space — the reader scrolls past three of these to
+ * reach anything real.
+ *
+ * `icon` is optional and worth passing: at a glance it says which card this is
+ * without the eye travelling up to the heading.
+ */
+export function Empty({
+  title,
+  hint,
+  icon,
+  action,
+}: {
+  title: string;
+  hint?: ReactNode;
+  icon?: ReactNode;
+  action?: ReactNode;
+}) {
   return (
     <div className="empty">
-      <h3>{title}</h3>
-      {hint ? <p>{hint}</p> : null}
+      {icon ? <span className="empty-icon">{icon}</span> : null}
+      <span className="empty-text">
+        <strong>{title}</strong>
+        {hint ? <span className="sub">{hint}</span> : null}
+      </span>
+      {action ? <span className="empty-action">{action}</span> : null}
     </div>
   );
 }

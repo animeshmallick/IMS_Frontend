@@ -135,7 +135,11 @@ export function Dashboard() {
           >
             <QueryState
               query={expiring}
-              empty={<Empty title="Nothing expiring" hint="No batch expires in the next 45 days." />}
+              empty={<Empty
+                  icon={<Clock size={14} aria-hidden />}
+                  title="Nothing expiring"
+                  hint="No batch expires in the next 45 days."
+                />}
             >
               <Table
                 head={
@@ -188,11 +192,19 @@ export function Dashboard() {
             flush
           >
             {!locationId ? (
-              <Empty title="No working location" hint="Choose where you are working to see this." />
+              <Empty
+                icon={<PackageSearch size={14} aria-hidden />}
+                title="No working location"
+                hint="Choose where you are working to see this."
+              />
             ) : (
               <QueryState
                 query={reorder}
-                empty={<Empty title="Nothing to reorder" hint="Every stocked item is above its reorder point." />}
+                empty={<Empty
+                    icon={<PackageSearch size={14} aria-hidden />}
+                    title="Nothing to reorder"
+                    hint="Every stocked item is above its reorder point."
+                  />}
               >
                 <Table
                   head={
@@ -232,7 +244,11 @@ export function Dashboard() {
         >
           <QueryState
             query={inTransit}
-            empty={<Empty title="Nothing in transit" hint="Every dispatched transfer has been received." />}
+            empty={<Empty
+              icon={<Truck size={14} aria-hidden />}
+              title="Nothing in transit"
+              hint="Every dispatched transfer has been received."
+            />}
           >
             <Table
               head={
