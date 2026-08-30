@@ -1542,6 +1542,10 @@
     min-height: 0;
   }
   .search-results button:last-child { border-bottom: none; }
+  .search-results button.active {
+    background: var(--accent-soft);
+    color: var(--accent);
+  }
 
   .location-switch {
     display: flex;

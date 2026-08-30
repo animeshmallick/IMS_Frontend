@@ -2,6 +2,7 @@ import { useState } from "react";
 import { api } from "../lib/api";
 import { useApi } from "../lib/hooks";
 import { useDebounced } from "./ui";
+import { LinkBarcode, looksScanned, useCanLinkBarcode } from "./LinkBarcode";
 import { money } from "../lib/format";
 import type { ScannedLabel, VariantSearchResult } from "../lib/types";
 
@@ -34,6 +35,8 @@ export function VariantPicker({
   showPrice?: boolean;
 }) {
   const [term, setTerm] = useState("");
+  const [linking, setLinking] = useState<string | null>(null);
+  const canLink = useCanLinkBarcode();
   const debounced = useDebounced(term);
 
   const results = useApi<VariantSearchResult[]>(
@@ -128,7 +131,44 @@ export function VariantPicker({
       ) : null}
 
       {debounced.trim() && results.isFetched && (results.data?.length ?? 0) === 0 ? (
-        <p className="small muted mt">Nothing matches “{debounced}”.</p>
+        looksScanned(debounced) ? (
+          /*
+           * A scanned code that resolves to nothing is either a first arrival
+           * or changed packaging — both fixable in seconds by someone with the
+           * permission. Saying only "nothing matches" leaves a cashier stuck
+           * with a customer in front of them.
+           */
+          <div className="alert warn mt">
+            <div className="grow">
+              <strong className="mono">{debounced}</strong> is not linked to any item.
+              <span className="sub">
+                {canLink
+                  ? "New product, or the packaging changed. Link it and carry on."
+                  : "New product, or the packaging changed. A manager can link it from this screen."}
+              </span>
+            </div>
+            {canLink ? (
+              <button type="button" className="sm" onClick={() => setLinking(debounced)}>
+                Link it
+              </button>
+            ) : null}
+          </div>
+        ) : (
+          <p className="small muted mt">Nothing matches “{debounced}”.</p>
+        )
+      ) : null}
+
+      {linking ? (
+        <LinkBarcode
+          barcode={linking}
+          onClose={() => setLinking(null)}
+          onLinked={(variant) => {
+            setLinking(null);
+            // Straight into the cart: the customer is still standing there, and
+            // making them re-scan after fixing it is a second interruption.
+            pick(variant);
+          }}
+        />
       ) : null}
     </div>
   );
