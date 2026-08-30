@@ -27,6 +27,7 @@ import type { ProductDetail, ProductVariantDetail, Uom } from "../../lib/types";
 export function ProductDetailPage() {
   const { id } = useParams<{ id: string }>();
   const { can } = useSessionContext();
+  const [barcoding, setBarcoding] = useState<ProductVariantDetail | null>(null);
   const [pricing, setPricing] = useState<ProductVariantDetail | null>(null);
   const [converting, setConverting] = useState<ProductVariantDetail | null>(null);
 
@@ -123,12 +124,29 @@ export function ProductDetailPage() {
               <td className="num muted">{qty(variant.reorderPoint)}</td>
               <td className="small">
                 {(variant.barcodes ?? []).map((barcode) => (
-                  <div key={barcode.id}>
+                  <div key={barcode.id} className="mono">
                     {barcode.barcode}
-                    {barcode.isPrimary ? " · primary" : ""}
+                    {barcode.isPrimary ? <span className="muted"> · primary</span> : null}
                   </div>
                 ))}
-                {(variant.barcodes ?? []).length === 0 ? <span className="muted">—</span> : null}
+                {/*
+                  * An item with nothing to scan cannot be sold at the counter
+                  * without searching for it by name, so this is a problem
+                  * rather than a blank — and the fix is one click away.
+                  */}
+                {(variant.barcodes ?? []).length === 0 ? (
+                  can("catalog:write") ? (
+                    <button type="button" className="sm" onClick={() => setBarcoding(variant)}>
+                      Add a barcode
+                    </button>
+                  ) : (
+                    <Badge tone="warn">None</Badge>
+                  )
+                ) : can("catalog:write") ? (
+                  <button type="button" className="ghost sm" onClick={() => setBarcoding(variant)}>
+                    Manage
+                  </button>
+                ) : null}
               </td>
               <td>
                 <div className="btn-row">
@@ -153,6 +171,10 @@ export function ProductDetailPage() {
         <Card title="Description">
           <p>{item.description}</p>
         </Card>
+      ) : null}
+
+      {barcoding ? (
+        <BarcodeDialog variant={barcoding} onClose={() => setBarcoding(null)} />
       ) : null}
 
       {pricing ? (
@@ -362,6 +384,190 @@ function UomModal({
           <option value="sale">Selling only</option>
         </select>
       </Field>
+    </Modal>
+  );
+}
+
+/**
+ * Barcodes for one SKU.
+ *
+ * The moment this exists for is receiving a product for the first time: the
+ * goods are on the bench, the packet is in your hand, and the barcode printed
+ * on it is the only source that is certainly right. Guessing one from a
+ * supplier catalogue before the goods arrive is how the wrong code gets stored
+ * and every scan afterwards finds nothing.
+ *
+ * For anything that will never have a printed code — unbranded, loose, repacked
+ * — the shop mints its own instead, and it goes on the counter sheet.
+ */
+function BarcodeDialog({ variant, onClose }: { variant: ProductVariantDetail; onClose: () => void }) {
+  const [value, setValue] = useState("");
+  /** The row being corrected, and what it is being corrected to. */
+  const [editing, setEditing] = useState<{ id: string; value: string } | null>(null);
+
+  const add = useApiMutation<{ barcode: string; isPrimary: boolean }, unknown>(
+    `/catalog/variants/${variant.id}/barcodes`,
+    { invalidate: [["catalog", "product"]], onSuccess: () => setValue("") },
+  );
+
+  const generate = useApiMutation<undefined, { barcode: string }>(
+    `/catalog/variants/${variant.id}/barcodes/generate`,
+    { method: "POST", invalidate: [["catalog", "product"]] },
+  );
+
+  const update = useApiMutation<{ id: string; barcode?: string; isPrimary?: boolean }, unknown>(
+    (body) => `/catalog/variants/${variant.id}/barcodes/${body.id}`,
+    { method: "PATCH", invalidate: [["catalog", "product"]], onSuccess: () => setEditing(null) },
+  );
+
+  const remove = useApiMutation<{ id: string }, unknown>(
+    (body) => `/catalog/variants/${variant.id}/barcodes/${body.id}`,
+    { method: "DELETE", invalidate: [["catalog", "product"]] },
+  );
+
+  const existing = variant.barcodes ?? [];
+
+  return (
+    <Modal
+      title={`Barcodes · ${variant.sku}`}
+      onClose={onClose}
+      footer={
+        <button type="button" onClick={onClose}>
+          Done
+        </button>
+      }
+    >
+      <ErrorBanner error={add.error ?? generate.error ?? remove.error ?? update.error} />
+
+      {existing.length > 0 ? (
+        <Table head={<tr><th>Barcode</th><th>Type</th><th /></tr>}>
+          {existing.map((b) => (
+            <tr key={b.id}>
+              <td className="mono">
+                {editing?.id === b.id ? (
+                  /*
+                   * Corrected in place rather than deleted and re-added. A
+                   * mistyped digit is one wrong character, and making someone
+                   * remove the row first invites them to leave the item with no
+                   * barcode at all if they are interrupted halfway.
+                   */
+                  <input
+                    autoFocus
+                    className="mono"
+                    value={editing.value}
+                    onChange={(event) => setEditing({ id: b.id, value: event.target.value })}
+                    onKeyDown={(event) => {
+                      if (event.key === "Enter" && editing.value.trim()) {
+                        update.mutate({ id: b.id, barcode: editing.value.trim() });
+                      }
+                      if (event.key === "Escape") setEditing(null);
+                    }}
+                  />
+                ) : (
+                  <>
+                    {b.barcode}
+                    {b.isPrimary ? <span className="sub">primary</span> : null}
+                  </>
+                )}
+              </td>
+              <td className="small muted">{b.type}</td>
+              <td className="right">
+                <div className="btn-row" style={{ justifyContent: "flex-end" }}>
+                  {editing?.id === b.id ? (
+                    <>
+                      <button
+                        type="button"
+                        className="primary sm"
+                        disabled={!editing.value.trim() || update.isPending}
+                        onClick={() => update.mutate({ id: b.id, barcode: editing.value.trim() })}
+                      >
+                        Save
+                      </button>
+                      <button type="button" className="ghost sm" onClick={() => setEditing(null)}>
+                        Cancel
+                      </button>
+                    </>
+                  ) : (
+                    <>
+                      <button
+                        type="button"
+                        className="ghost sm"
+                        onClick={() => setEditing({ id: b.id, value: b.barcode })}
+                      >
+                        Edit
+                      </button>
+                      {!b.isPrimary ? (
+                        <button
+                          type="button"
+                          className="ghost sm"
+                          disabled={update.isPending}
+                          onClick={() => update.mutate({ id: b.id, isPrimary: true })}
+                          title="The counter sheet prints the primary code"
+                        >
+                          Make primary
+                        </button>
+                      ) : null}
+                      <button
+                        type="button"
+                        className="ghost sm danger"
+                        disabled={remove.isPending}
+                        onClick={() => remove.mutate({ id: b.id })}
+                      >
+                        Remove
+                      </button>
+                    </>
+                  )}
+                </div>
+              </td>
+            </tr>
+          ))}
+        </Table>
+      ) : (
+        <div className="alert warn">
+          <div>
+            <strong>Nothing to scan.</strong> This item can only be found by searching for
+            it by name at the counter, which is slow with a queue waiting.
+          </div>
+        </div>
+      )}
+
+      <h3>Scan the packet</h3>
+      <form
+        className="inline-form"
+        onSubmit={(event) => {
+          event.preventDefault();
+          if (value.trim()) add.mutate({ barcode: value.trim(), isPrimary: existing.length === 0 });
+        }}
+      >
+        <Field label="Barcode">
+          {/*
+            * autoFocus so a scanner, which types and then presses Enter, works
+            * without anyone touching the mouse. Receiving is done standing up.
+            */}
+          <input
+            autoFocus
+            className="mono"
+            value={value}
+            placeholder="Scan or type"
+            onChange={(event) => setValue(event.target.value)}
+          />
+        </Field>
+        <button type="submit" className="primary" disabled={!value.trim() || add.isPending}>
+          Add
+        </button>
+      </form>
+
+      <p className="hint mt">
+        No barcode on the packet? Make one — it prints on the counter sheet, and the till
+        reads it exactly like a manufacturer code, offline included.
+      </p>
+      <button
+        type="button"
+        disabled={generate.isPending}
+        onClick={() => generate.mutate(undefined)}
+      >
+        Create one for this item
+      </button>
     </Modal>
   );
 }
