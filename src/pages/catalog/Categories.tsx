@@ -1,3 +1,4 @@
+import { Tags } from "lucide-react";
 import { useState } from "react";
 import { useApi, useApiMutation } from "../../lib/hooks";
 import { useSessionContext } from "../../lib/session";
@@ -55,7 +56,7 @@ export function Categories() {
         <Card title="Category tree" flush>
           <QueryState
             query={categories}
-            empty={<Empty title="No categories" hint="Add one to organise your products." />}
+            empty={<Empty icon={<Tags size={14} aria-hidden />} title="No categories" hint="Add one to organise your products." />}
           >
             <Table
               head={
@@ -91,7 +92,7 @@ export function Categories() {
         </Card>
 
         <Card title="Brands" flush>
-          <QueryState query={brands} empty={<Empty title="No brands" />}>
+          <QueryState query={brands} empty={<Empty icon={<Tags size={14} aria-hidden />} title="No brands" />}>
             <Table
               head={
                 <tr>

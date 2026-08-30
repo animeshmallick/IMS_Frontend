@@ -1,3 +1,4 @@
+import { PackageMinus } from "lucide-react";
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useApiList } from "../../lib/hooks";
@@ -104,7 +105,7 @@ export function Adjustments() {
       <Card flush>
         <QueryState
           query={{ ...adjustments, data: adjustments.data?.items }}
-          empty={<Empty title="No adjustments" hint="Nothing has been written off or found." />}
+          empty={<Empty icon={<PackageMinus size={14} aria-hidden />} title="No adjustments" hint="Nothing has been written off or found." />}
         >
           <Table
             head={

@@ -1,3 +1,4 @@
+import { HeartPulse } from "lucide-react";
 import { useState } from "react";
 import { useApi, useApiMutation } from "../../lib/hooks";
 import { useSessionContext } from "../../lib/session";
@@ -214,7 +215,7 @@ export function SystemHealth() {
       >
         <QueryState
           query={alerts}
-          empty={<Empty title="Nothing to report" hint="No exceptions have been raised." />}
+          empty={<Empty icon={<HeartPulse size={14} aria-hidden />} title="Nothing to report" hint="No exceptions have been raised." />}
         >
           <Table
             head={

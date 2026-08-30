@@ -1,3 +1,4 @@
+import { Building2 } from "lucide-react";
 import { useState } from "react";
 import { useApi, useApiMutation } from "../../lib/hooks";
 import { useSessionContext } from "../../lib/session";
@@ -53,7 +54,7 @@ export function LocationsAdmin() {
       <Card title="Warehouses and stores" flush>
         <QueryState
           query={{ ...locations, data: real }}
-          empty={<Empty title="No locations" hint="Add the places you hold stock." />}
+          empty={<Empty icon={<Building2 size={14} aria-hidden />} title="No locations" hint="Add the places you hold stock." />}
         >
           <Table
             head={

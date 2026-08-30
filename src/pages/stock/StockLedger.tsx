@@ -1,3 +1,4 @@
+import { FileClock } from "lucide-react";
 import { useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { useApi, useApiList } from "../../lib/hooks";
@@ -100,7 +101,7 @@ export function StockLedger() {
       <Card flush>
         <QueryState
           query={{ ...ledger, data: ledger.data?.items }}
-          empty={<Empty title="No movements" hint="Nothing has moved that matches these filters." />}
+          empty={<Empty icon={<FileClock size={14} aria-hidden />} title="No movements" hint="Nothing has moved that matches these filters." />}
         >
           <Table
             head={

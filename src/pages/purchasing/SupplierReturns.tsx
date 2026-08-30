@@ -1,3 +1,4 @@
+import { RotateCcw } from "lucide-react";
 import { useState } from "react";
 import { useApi, useApiList, useApiMutation } from "../../lib/hooks";
 import { useSessionContext } from "../../lib/session";
@@ -180,6 +181,7 @@ export function SupplierReturns() {
           query={{ ...returns, data: returns.data?.items }}
           empty={
             <Empty
+              icon={<RotateCcw size={14} aria-hidden />}
               title="No supplier returns"
               hint="Nothing has been sent back to a wholesaler."
             />

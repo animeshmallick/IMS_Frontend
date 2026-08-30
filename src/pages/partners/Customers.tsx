@@ -1,3 +1,4 @@
+import { Users } from "lucide-react";
 import { useState } from "react";
 import { useApi, useApiMutation } from "../../lib/hooks";
 import { useSessionContext } from "../../lib/session";
@@ -63,13 +64,14 @@ export function Customers() {
       <Card flush>
         {debounced.trim().length === 0 ? (
           <Empty
+            icon={<Users size={14} aria-hidden />}
             title="Search for a customer"
             hint="Type a phone number or name to find someone."
           />
         ) : customers.isPending ? (
           <p className="loading">Searching...</p>
         ) : (customers.data?.length ?? 0) === 0 ? (
-          <Empty title="Nobody matches" hint={`No customer found for “${debounced}”.`} />
+          <Empty icon={<Users size={14} aria-hidden />} title="Nobody matches" hint={`No customer found for “${debounced}”.`} />
         ) : (
           <Table
             head={

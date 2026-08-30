@@ -1,3 +1,4 @@
+import { Package } from "lucide-react";
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useApi, useApiList } from "../../lib/hooks";
@@ -137,6 +138,7 @@ export function Products() {
           query={{ ...products, data: products.data?.items }}
           empty={
             <Empty
+              icon={<Package size={14} aria-hidden />}
               title="No products"
               hint={can("catalog:write") ? "Add your first product to start trading." : undefined}
             />

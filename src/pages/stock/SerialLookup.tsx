@@ -1,3 +1,4 @@
+import { BadgeCheck } from "lucide-react";
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import { useApi } from "../../lib/hooks";
@@ -101,6 +102,7 @@ export function SerialLookup() {
       {submitted && history.isError ? (
         <Card>
           <Empty
+            icon={<BadgeCheck size={14} aria-hidden />}
             title="No unit on file with that number"
             hint="Check the number, or it may be from a product that is not tracked by unit."
           />

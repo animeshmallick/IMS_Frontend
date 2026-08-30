@@ -1,3 +1,4 @@
+import { BarChart3 } from "lucide-react";
 import { useState } from "react";
 import { useApi } from "../../lib/hooks";
 import { useSessionContext } from "../../lib/session";
@@ -207,7 +208,7 @@ export function Insights() {
         >
           <QueryState
             query={suppliers}
-            empty={<Empty title="No deliveries in this period" />}
+            empty={<Empty icon={<BarChart3 size={14} aria-hidden />} title="No deliveries in this period" />}
           >
             <Table
               head={
@@ -276,7 +277,7 @@ export function Insights() {
       {/* ------------------------------------------------------------ staff */}
       {tab === "staff" ? (
         <Card title="Staff and counter" flush>
-          <QueryState query={staff} empty={<Empty title="No sales in this period" />}>
+          <QueryState query={staff} empty={<Empty icon={<BarChart3 size={14} aria-hidden />} title="No sales in this period" />}>
             <Table
               head={
                 <tr>
@@ -338,7 +339,7 @@ export function Insights() {
         <Card title="Shrinkage by reason" flush>
           <QueryState
             query={shrink}
-            empty={<Empty title="No stock written off" hint="Nothing has been lost, damaged or expired in this period." />}
+            empty={<Empty icon={<BarChart3 size={14} aria-hidden />} title="No stock written off" hint="Nothing has been lost, damaged or expired in this period." />}
           >
             <Table
               head={
@@ -392,7 +393,7 @@ export function Insights() {
         >
           <QueryState
             query={dead}
-            empty={<Empty title="Everything is moving" hint="No stock has been idle this long." />}
+            empty={<Empty icon={<BarChart3 size={14} aria-hidden />} title="Everything is moving" hint="No stock has been idle this long." />}
           >
             <Table
               head={
@@ -446,6 +447,7 @@ export function Insights() {
             query={margin}
             empty={
               <Empty
+                icon={<BarChart3 size={14} aria-hidden />}
                 title="No margin erosion detected"
                 hint="No product has had its cost rise without a price review."
               />
@@ -507,6 +509,7 @@ export function Insights() {
             query={accuracy}
             empty={
               <Empty
+                icon={<BarChart3 size={14} aria-hidden />}
                 title="No counts posted"
                 hint="Run a stock count to find out how closely the records match the shelf."
               />
@@ -562,7 +565,7 @@ export function Insights() {
       {/* -------------------------------------------------------- trading */}
       {tab === "trading" ? (
         <Card title="When the shop is busy" flush>
-          <QueryState query={trading} empty={<Empty title="No sales in this period" />}>
+          <QueryState query={trading} empty={<Empty icon={<BarChart3 size={14} aria-hidden />} title="No sales in this period" />}>
             <Table
               head={
                 <tr>

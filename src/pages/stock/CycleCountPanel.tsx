@@ -1,3 +1,4 @@
+import { ClipboardCheck } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useApi, useApiMutation } from "../../lib/hooks";
 import { useSessionContext } from "../../lib/session";
@@ -88,6 +89,7 @@ export function CycleCountPanel() {
     return (
       <Card title="Cycle counting">
         <Empty
+          icon={<ClipboardCheck size={14} aria-hidden />}
           title="No working location"
           hint="Choose the store or warehouse you are counting at."
         />
@@ -174,7 +176,7 @@ export function CycleCountPanel() {
       >
         <QueryState
           query={due}
-          empty={<Empty title="Nothing held here" hint="There is no stock at this location." />}
+          empty={<Empty icon={<ClipboardCheck size={14} aria-hidden />} title="Nothing held here" hint="There is no stock at this location." />}
         >
           <Table
             head={

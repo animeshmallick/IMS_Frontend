@@ -1,3 +1,4 @@
+import { ScanLine } from "lucide-react";
 import { useState } from "react";
 import { useApiList } from "../../lib/hooks";
 import {
@@ -91,7 +92,7 @@ export function AuditTrail() {
       <Card flush>
         <QueryState
           query={{ ...entries, data: entries.data?.items }}
-          empty={<Empty title="Nothing recorded" hint="No audit entries match these filters." />}
+          empty={<Empty icon={<ScanLine size={14} aria-hidden />} title="Nothing recorded" hint="No audit entries match these filters." />}
         >
           <Table
             head={

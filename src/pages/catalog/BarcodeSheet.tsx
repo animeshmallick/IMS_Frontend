@@ -1,5 +1,5 @@
 import JsBarcode from "jsbarcode";
-import { Printer, Wand2 } from "lucide-react";
+import { Barcode, Printer, Wand2 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Card, Empty, ErrorBanner, Field, PageHead, QueryState } from "../../components/ui";
 import { useToast } from "../../components/feedback";
@@ -154,13 +154,14 @@ export function BarcodeSheet() {
           query={sheet}
           empty={
             <Empty
+              icon={<Barcode size={14} aria-hidden />}
               title="Nothing to print yet"
               hint="Add some products, then create barcodes for the ones that arrived without."
             />
           }
         >
           {rows.length === 0 ? (
-            <Empty title="Nothing matches" hint="Try a different search." />
+            <Empty icon={<Barcode size={14} aria-hidden />} title="Nothing matches" hint="Try a different search." />
           ) : (
             <div className="barcode-sheet">
               {rows.map((row) => (

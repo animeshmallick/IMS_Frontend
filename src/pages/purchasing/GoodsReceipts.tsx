@@ -1,3 +1,4 @@
+import { PackageCheck } from "lucide-react";
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useApi, useApiList } from "../../lib/hooks";
@@ -124,6 +125,7 @@ export function GoodsReceipts() {
           query={{ ...receipts, data: receipts.data?.items }}
           empty={
             <Empty
+              icon={<PackageCheck size={14} aria-hidden />}
               title={draftsOnly ? "No drafts" : "No deliveries recorded"}
               hint={
                 draftsOnly

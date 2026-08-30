@@ -1,3 +1,4 @@
+import { Truck } from "lucide-react";
 import { useState } from "react";
 import { useApiList, useApiMutation } from "../../lib/hooks";
 import { useSessionContext } from "../../lib/session";
@@ -62,7 +63,7 @@ export function Suppliers() {
       <Card flush>
         <QueryState
           query={{ ...suppliers, data: suppliers.data?.items }}
-          empty={<Empty title="No suppliers" hint="Add the wholesalers you buy from." />}
+          empty={<Empty icon={<Truck size={14} aria-hidden />} title="No suppliers" hint="Add the wholesalers you buy from." />}
         >
           <Table
             head={

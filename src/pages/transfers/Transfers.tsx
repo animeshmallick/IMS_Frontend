@@ -1,3 +1,4 @@
+import { ArrowLeftRight } from "lucide-react";
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useApi, useApiList } from "../../lib/hooks";
@@ -108,6 +109,7 @@ export function Transfers() {
           query={{ ...transfers, data: transfers.data?.items }}
           empty={
             <Empty
+              icon={<ArrowLeftRight size={14} aria-hidden />}
               title="No transfers"
               hint="Raise one to move stock from a warehouse to a store."
             />

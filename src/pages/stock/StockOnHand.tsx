@@ -16,7 +16,7 @@ import {
 import { date, daysUntil, money } from "../../lib/format";
 import { SkeletonStats } from "../../components/feedback";
 import { useUnits } from "../../lib/use-units";
-import { Search } from "lucide-react";
+import { Boxes, Search } from "lucide-react";
 import type { Location, StockBalance, Valuation } from "../../lib/types";
 
 /**
@@ -206,6 +206,7 @@ export function StockOnHand() {
           query={{ ...balances, data: balances.data?.items }}
           empty={
             <Empty
+              icon={<Boxes size={14} aria-hidden />}
               title="No stock matches"
               hint="Try a different search, or tick 'include zero balances' to see items that have run out."
             />

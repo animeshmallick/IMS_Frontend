@@ -1,3 +1,4 @@
+import { ShieldCheck } from "lucide-react";
 import { useState } from "react";
 import { useApi, useApiMutation } from "../../lib/hooks";
 import { useSessionContext } from "../../lib/session";
@@ -47,7 +48,7 @@ export function Roles() {
       />
 
       <Card flush>
-        <QueryState query={roles} empty={<Empty title="No roles" />}>
+        <QueryState query={roles} empty={<Empty icon={<ShieldCheck size={14} aria-hidden />} title="No roles" />}>
           <Table
             head={
               <tr>

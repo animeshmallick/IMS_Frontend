@@ -1,3 +1,4 @@
+import { ClipboardList } from "lucide-react";
 import { useApiList } from "../../lib/hooks";
 import { useSessionContext } from "../../lib/session";
 import { Badge, Card, Empty, PageHead, Pager, QueryState, Table } from "../../components/ui";
@@ -93,6 +94,7 @@ export function PurchaseOrders() {
           query={{ ...orders, data: orders.data?.items }}
           empty={
             <Empty
+              icon={<ClipboardList size={14} aria-hidden />}
               title={
                 view === "todo"
                   ? "Nothing waiting on you"

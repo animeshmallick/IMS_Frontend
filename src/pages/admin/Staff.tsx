@@ -1,3 +1,4 @@
+import { Users } from "lucide-react";
 import { useState } from "react";
 import { useApi, useApiList, useApiMutation } from "../../lib/hooks";
 import { useSessionContext } from "../../lib/session";
@@ -87,7 +88,7 @@ export function Staff() {
       <Card flush>
         <QueryState
           query={{ ...staff, data: staff.data?.items }}
-          empty={<Empty title="No staff found" />}
+          empty={<Empty icon={<Users size={14} aria-hidden />} title="No staff found" />}
         >
           <Table
             head={

@@ -1,3 +1,4 @@
+import { Archive } from "lucide-react";
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useApi, useApiMutation } from "../../lib/hooks";
@@ -178,6 +179,7 @@ export function Replenishment() {
           query={plan}
           empty={
             <Empty
+              icon={<Archive size={14} aria-hidden />}
               title="Nothing needs ordering"
               hint="Every item is above its reorder point. Tick “show items that are fine” to see them all."
             />

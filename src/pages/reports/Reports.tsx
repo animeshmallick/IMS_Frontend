@@ -1,3 +1,4 @@
+import { BarChart3 } from "lucide-react";
 import { useState } from "react";
 import { useApi } from "../../lib/hooks";
 import { useSessionContext } from "../../lib/session";
@@ -180,7 +181,7 @@ export function Reports() {
         <Card title="Sales by day" flush>
           <QueryState
             query={summary}
-            empty={<Empty title="No sales in this period" />}
+            empty={<Empty icon={<BarChart3 size={14} aria-hidden />} title="No sales in this period" />}
           >
             <Table
               head={
@@ -215,7 +216,7 @@ export function Reports() {
 
       <div className="grid cols-2">
         <Card title="Best sellers" flush>
-          <QueryState query={top} empty={<Empty title="Nothing sold in this period" />}>
+          <QueryState query={top} empty={<Empty icon={<BarChart3 size={14} aria-hidden />} title="Nothing sold in this period" />}>
             <Table
               head={
                 <tr>
@@ -243,7 +244,7 @@ export function Reports() {
 
         {financial ? (
           <Card title="How customers paid" flush>
-            <QueryState query={payments} empty={<Empty title="No payments in this period" />}>
+            <QueryState query={payments} empty={<Empty icon={<BarChart3 size={14} aria-hidden />} title="No payments in this period" />}>
               <Table
                 head={
                   <tr>
@@ -269,7 +270,7 @@ export function Reports() {
       {financial ? (
         <div className="grid cols-2">
           <Card title="Sales by location" flush>
-            <QueryState query={byLocation} empty={<Empty title="No sales in this period" />}>
+            <QueryState query={byLocation} empty={<Empty icon={<BarChart3 size={14} aria-hidden />} title="No sales in this period" />}>
               <Table
                 head={
                   <tr>
@@ -295,7 +296,7 @@ export function Reports() {
           <Card title="Purchases received, by supplier" flush>
             <QueryState
               query={purchases}
-              empty={<Empty title="Nothing received in this period" />}
+              empty={<Empty icon={<BarChart3 size={14} aria-hidden />} title="Nothing received in this period" />}
             >
               <Table
                 head={
@@ -324,7 +325,7 @@ export function Reports() {
       <Card title="Expiring within 60 days" flush>
         <QueryState
           query={expiring}
-          empty={<Empty title="Nothing expiring soon" />}
+          empty={<Empty icon={<BarChart3 size={14} aria-hidden />} title="Nothing expiring soon" />}
         >
           <Table
             head={

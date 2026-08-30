@@ -1,3 +1,4 @@
+import { Receipt } from "lucide-react";
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useApiList } from "../../lib/hooks";
@@ -37,7 +38,7 @@ export function Bills() {
       <Card flush>
         <QueryState
           query={{ ...bills, data: bills.data?.items }}
-          empty={<Empty title="No bills yet" hint="Sales placed at this location will appear here." />}
+          empty={<Empty icon={<Receipt size={14} aria-hidden />} title="No bills yet" hint="Sales placed at this location will appear here." />}
         >
           <Table
             head={

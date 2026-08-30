@@ -1,3 +1,4 @@
+import { ClipboardCheck } from "lucide-react";
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useApi, useApiList, useApiMutation } from "../../lib/hooks";
@@ -101,6 +102,7 @@ export function StockCounts() {
           query={{ ...counts, data: counts.data?.items }}
           empty={
             <Empty
+              icon={<ClipboardCheck size={14} aria-hidden />}
               title="No stock counts"
               hint="Start one to check what is physically on the shelves."
             />
