@@ -172,7 +172,7 @@ export function PurchaseOrderDetailPage() {
         <Card>
           <div className="stat">
             <div className="label">Expected</div>
-            <div className="value" style={{ fontSize: "1.1rem" }}>
+            <div className="value text">
               {date(order.expectedDate)}
             </div>
           </div>
@@ -189,7 +189,7 @@ export function PurchaseOrderDetailPage() {
         <Card>
           <div className="stat">
             <div className="label">Approved</div>
-            <div className="value" style={{ fontSize: "1.1rem" }}>
+            <div className="value text">
               {order.approvedAt ? dateTime(order.approvedAt) : "Not yet"}
             </div>
           </div>

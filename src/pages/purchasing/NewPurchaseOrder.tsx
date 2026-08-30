@@ -202,11 +202,11 @@ export function NewPurchaseOrder() {
             head={
               <tr>
                 <th>Item</th>
-                <th style={{ width: "9rem" }}>Order unit</th>
-                <th style={{ width: "7rem" }} className="num">
+                <th className="w-date">Order unit</th>
+                <th className="num w-qty">
                   Quantity
                 </th>
-                <th style={{ width: "8rem" }} className="num">
+                <th className="num w-money">
                   Unit cost
                 </th>
                 <th className="num">Line total</th>

@@ -304,12 +304,38 @@
 
   .small { font-size: var(--text-sm); }
   .muted { color: var(--muted); }
+
+  /*
+   * State on a figure: a shortfall, a variance, stock going the wrong way.
+   *
+   * Named rather than written inline, so a theme swap moves them with
+   * everything else — an inline var() is fine until the palette changes and one
+   * screen keeps the old value because nobody remembered it was there.
+   */
+  .text-danger { color: var(--danger); }
+  .text-success { color: var(--success); }
+  .text-warn { color: var(--warn); }
+
+  /*
+   * A proportional bar inside a table cell.
+   *
+   * Reads faster than a number when the question is "which of these is biggest"
+   * rather than "how many exactly" — the figure is usually in the next column
+   * anyway. Only the width varies per row.
+   */
+  .bar {
+    height: 0.6rem;
+    min-width: 2px;
+    border-radius: 3px;
+    background: var(--accent);
+  }
   .faint { color: var(--faint); }
   .nowrap { white-space: nowrap; }
   .center { text-align: center; }
   .right { text-align: right; }
   .mt { margin-top: 1rem; }
   .mb { margin-bottom: 1rem; }
+  .mb-xs { margin-bottom: 0.25rem; }
   .grow { flex: 1; }
 
   /* A secondary line under a primary value: the product name under a SKU. */
@@ -821,6 +847,8 @@
   }
 
   .card-body { padding: 1rem; }
+  /* Something sitting inside a flush card that still wants the card's padding. */
+  .card-inset { margin: 1rem; }
   .card-body > :last-child { margin-bottom: 0; }
 
   /* A single figure and its label. The figure leads; the label explains. */
@@ -842,6 +870,23 @@
     font-variant-numeric: tabular-nums;
   }
   .stat .value.lg { font-size: var(--text-3xl); }
+
+  /*
+   * A stat whose value is WORDS, not a number.
+   *
+   * "Kilogram", "Partially received", "Drift detected" — twenty-one screens had
+   * reached for an inline font-size to stop those overflowing the card, each
+   * picking a slightly different one. The figure sizes were never wrong; there
+   * was simply no variant for the case where the value is text, so every screen
+   * invented one.
+   */
+  .stat .value.text {
+    font-size: var(--text-lg);
+    font-weight: 600;
+    letter-spacing: -0.005em;
+    line-height: 1.3;
+  }
+  .stat .value.text.sm { font-size: var(--text-base); }
   .stat .hint { margin-top: 0.25rem; }
   .stat .value.danger { color: var(--danger); }
   .stat .value.warn { color: var(--warn); }
@@ -1028,6 +1073,8 @@
     gap: 0.5rem;
     flex-wrap: wrap;
   }
+  /* Buttons pushed to the trailing edge of their row. */
+  .btn-row.end { justify-content: flex-end; }
 
   /* ---------------------------------------------------------------- forms */
 

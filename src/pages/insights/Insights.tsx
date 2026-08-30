@@ -255,7 +255,7 @@ export function Insights() {
                     <td className="num muted">{row.avgLeadDays} d</td>
                     <td className="num">
                       {/* Positive means they invoiced above the agreed price. */}
-                      <span style={{ color: overcharged ? "var(--danger)" : undefined }}>
+                      <span className={overcharged ? "text-danger" : undefined}>
                         {money(row.priceVariance)}
                       </span>
                     </td>
@@ -318,7 +318,7 @@ export function Insights() {
                         <span className="muted">—</span>
                       ) : (
                         <>
-                          <span style={{ color: variance !== 0 ? "var(--danger)" : undefined }}>
+                          <span className={variance !== 0 ? "text-danger" : undefined}>
                             {money(row.totalCashVariance)}
                           </span>
                           <span className="sub">{row.shiftsClosed} shifts</span>
@@ -588,12 +588,11 @@ export function Insights() {
                     <td>
                       {/* A plain proportional bar reads faster than a number here. */}
                       <div
+                        className="bar"
                         style={{
-                          height: "0.6rem",
-                          borderRadius: "3px",
-                          background: "var(--accent)",
+                          // The only genuinely dynamic value: everything else
+                          // about the bar is the same on every row.
                           width: `${(row.bills / peak) * 100}%`,
-                          minWidth: "2px",
                         }}
                         aria-label={`${row.bills} bills`}
                       />

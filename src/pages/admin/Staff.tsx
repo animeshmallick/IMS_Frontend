@@ -71,8 +71,7 @@ export function Staff() {
             }}
           />
         </Field>
-        <Field label=" ">
-          <label className="row small">
+        <label className="check">
             <input
               type="checkbox"
               checked={includeInactive}
@@ -83,7 +82,6 @@ export function Staff() {
             />
             Include deactivated
           </label>
-        </Field>
       </div>
 
       <Card flush>

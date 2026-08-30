@@ -136,7 +136,7 @@ export function StockLedger() {
                     </Badge>
                   </td>
                   <td className="num">
-                    <strong style={{ color: inward ? "var(--success)" : "var(--danger)" }}>
+                    <strong className={inward ? "text-success" : "text-danger"}>
                       {inward ? "+" : ""}
                       {units.format(entry.qtyDelta, entry.stockUomCode)}
                     </strong>

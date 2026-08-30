@@ -240,7 +240,7 @@ export function NewAdjustment() {
                 <th>Item</th>
                 <th>Batch</th>
                 <th className="num">Available</th>
-                <th className="num" style={{ width: "8rem" }}>
+                <th className="num w-money">
                   Change
                 </th>
                 <th className="num">Cost impact</th>

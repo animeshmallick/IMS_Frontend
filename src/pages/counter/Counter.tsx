@@ -955,8 +955,7 @@ function CustomerPanel({
             <button
               type="button"
               key={customer.id}
-              className="sm"
-              style={{ width: "100%", marginBottom: "0.25rem" }}
+              className="sm block mb-xs"
               onClick={() => void attach(customer.id)}
             >
               {customer.name} {customer.phone ? `· ${customer.phone}` : ""}
@@ -967,7 +966,7 @@ function CustomerPanel({
 
       {canDiscount ? (
         <>
-          <hr style={{ border: "none", borderTop: "1px solid var(--border)", margin: "0.7rem 0" }} />
+          <hr  />
           <Field label="Bill discount" help="A reason is required — discounts are reported on.">
             <input
               inputMode="decimal"

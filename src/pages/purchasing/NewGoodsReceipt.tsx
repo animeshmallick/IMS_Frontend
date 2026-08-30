@@ -286,19 +286,19 @@ export function NewGoodsReceipt() {
         <Table
           head={
             <tr>
-              <th style={{ width: "2rem" }} />
+              <th className="w-tick" />
               <th>Item</th>
               <th className="num">Outstanding</th>
-              <th className="num" style={{ width: "7rem" }}>
+              <th className="num w-qty">
                 Received
               </th>
-              <th className="num" style={{ width: "7rem" }}>
+              <th className="num w-qty">
                 Rejected
               </th>
-              <th className="num" style={{ width: "8rem" }}>
+              <th className="num w-money">
                 Unit cost
               </th>
-              <th style={{ width: "16rem" }}>Batch &amp; expiry</th>
+              <th className="w-wide">Batch &amp; expiry</th>
             </tr>
           }
         >

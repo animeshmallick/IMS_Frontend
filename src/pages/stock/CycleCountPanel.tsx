@@ -2,6 +2,7 @@ import { useNavigate } from "react-router-dom";
 import { useApi, useApiMutation } from "../../lib/hooks";
 import { useSessionContext } from "../../lib/session";
 import { Badge, Card, Empty, ErrorBanner, QueryState, Table } from "../../components/ui";
+import { SkeletonStats } from "../../components/feedback";
 import { date, money, qty } from "../../lib/format";
 
 interface CycleRow {
@@ -99,6 +100,12 @@ export function CycleCountPanel() {
 
   return (
     <>
+      {health.isPending ? (
+        <div className="mb">
+          <SkeletonStats count={4} />
+        </div>
+      ) : null}
+
       {health.data ? (
         <div className="grid cols-4 mb">
           <Card>

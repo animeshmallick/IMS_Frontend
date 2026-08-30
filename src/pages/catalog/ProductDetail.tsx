@@ -73,7 +73,7 @@ export function ProductDetailPage() {
         <Card>
           <div className="stat">
             <div className="label">Stock unit</div>
-            <div className="value" style={{ fontSize: "1.2rem" }}>
+            <div className="value text">
               {item.stockUomCode}
             </div>
             <div className="hint">{item.isDivisible ? "Sold in fractions" : "Whole units only"}</div>
@@ -82,7 +82,7 @@ export function ProductDetailPage() {
         <Card>
           <div className="stat">
             <div className="label">Kind</div>
-            <div className="value" style={{ fontSize: "1.2rem" }}>
+            <div className="value text">
               {humanise(item.productType)}
             </div>
           </div>
@@ -90,7 +90,7 @@ export function ProductDetailPage() {
         <Card>
           <div className="stat">
             <div className="label">Expiry</div>
-            <div className="value" style={{ fontSize: "1.2rem" }}>
+            <div className="value text">
               {item.trackExpiry ? "Tracked" : "Not tracked"}
             </div>
             <div className="hint">
@@ -101,7 +101,7 @@ export function ProductDetailPage() {
         <Card>
           <div className="stat">
             <div className="label">Serials</div>
-            <div className="value" style={{ fontSize: "1.2rem" }}>
+            <div className="value text">
               {item.trackSerial ? "Tracked" : "Not tracked"}
             </div>
           </div>
@@ -495,7 +495,7 @@ function BarcodeDialog({ variant, onClose }: { variant: ProductVariantDetail; on
               </td>
               <td className="small muted">{b.type}</td>
               <td className="right">
-                <div className="btn-row" style={{ justifyContent: "flex-end" }}>
+                <div className="btn-row end">
                   {editing?.id === b.id ? (
                     <>
                       <button

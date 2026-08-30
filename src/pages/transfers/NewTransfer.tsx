@@ -191,8 +191,8 @@ export function NewTransfer() {
               <tr>
                 <th>Item</th>
                 <th className="num">Available at source</th>
-                <th style={{ width: "9rem" }}>Unit</th>
-                <th className="num" style={{ width: "7rem" }}>
+                <th className="w-date">Unit</th>
+                <th className="num w-qty">
                   Quantity
                 </th>
                 <th />
@@ -214,7 +214,7 @@ export function NewTransfer() {
                     {stock === undefined ? (
                       <span className="muted">—</span>
                     ) : (
-                      <span style={{ color: short ? "var(--danger)" : undefined }}>
+                      <span className={short ? "text-danger" : undefined}>
                         {qty(stock)} {line.stockUomCode}
                       </span>
                     )}

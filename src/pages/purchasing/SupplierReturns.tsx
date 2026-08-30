@@ -162,8 +162,7 @@ export function SupplierReturns() {
             ))}
           </select>
         </Field>
-        <Field label=" ">
-          <label className="row small">
+        <label className="check">
             <input
               type="checkbox"
               checked={awaitingCredit}
@@ -174,7 +173,6 @@ export function SupplierReturns() {
             />
             Only those awaiting a credit note
           </label>
-        </Field>
       </div>
 
       <Card flush>
@@ -506,7 +504,7 @@ function NewReturnModal({
               <tr>
                 <th>Item</th>
                 <th className="num">Available</th>
-                <th className="num" style={{ width: "6rem" }}>
+                <th className="num w-qty">
                   Send back
                 </th>
                 <th className="num">Value</th>

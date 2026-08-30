@@ -116,7 +116,7 @@ export function SystemHealth() {
           <Card>
             <div className="stat">
               <div className="label">Database</div>
-              <div className="value" style={{ fontSize: "1.1rem" }}>
+              <div className="value text">
                 <Badge tone={data?.database === "connected" ? "success" : "danger"}>
                   {humanise(data?.database ?? "unknown")}
                 </Badge>
@@ -127,7 +127,7 @@ export function SystemHealth() {
           <Card>
             <div className="stat">
               <div className="label">Books balance</div>
-              <div className="value" style={{ fontSize: "1.1rem" }}>
+              <div className="value text">
                 <Badge tone={integrityOk ? "success" : "danger"}>
                   {integrityOk ? "Yes" : `${data?.driftRows} rows adrift`}
                 </Badge>
@@ -151,7 +151,7 @@ export function SystemHealth() {
           <Card>
             <div className="stat">
               <div className="label">Last stock movement</div>
-              <div className="value" style={{ fontSize: "1rem" }}>
+              <div className="value text sm">
                 {dateTime(data?.lastStockMovementAt)}
               </div>
             </div>
@@ -160,7 +160,7 @@ export function SystemHealth() {
 
         {!integrityOk ? (
           <Card title="Ledger drift — needs attention" flush>
-            <div className="alert error" style={{ margin: "0.9rem" }}>
+            <div className="alert error card-inset">
               Recorded stock balances disagree with the movement ledger. Until this is explained,
               every stock figure in the system is suspect. This should never happen.
             </div>

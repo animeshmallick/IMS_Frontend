@@ -121,7 +121,7 @@ export function GoodsReceiptDetailPage() {
         <Card>
           <div className="stat">
             <div className="label">Supplier invoice</div>
-            <div className="value" style={{ fontSize: "1rem" }}>
+            <div className="value text sm">
               {receipt.supplierInvoiceNo ?? "—"}
             </div>
             <div className="hint">{date(receipt.supplierInvoiceDate)}</div>
@@ -130,7 +130,7 @@ export function GoodsReceiptDetailPage() {
         <Card>
           <div className="stat">
             <div className="label">Posted</div>
-            <div className="value" style={{ fontSize: "1rem" }}>
+            <div className="value text sm">
               {receipt.postedAt ? dateTime(receipt.postedAt) : "Not yet"}
             </div>
           </div>

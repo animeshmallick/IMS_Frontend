@@ -157,7 +157,7 @@ export function TransferDetailPage() {
         <Card>
           <div className="stat">
             <div className="label">Dispatched</div>
-            <div className="value" style={{ fontSize: "1rem" }}>
+            <div className="value text sm">
               {doc.dispatchedAt ? dateTime(doc.dispatchedAt) : "Not yet"}
             </div>
           </div>
@@ -165,7 +165,7 @@ export function TransferDetailPage() {
         <Card>
           <div className="stat">
             <div className="label">Received</div>
-            <div className="value" style={{ fontSize: "1rem" }}>
+            <div className="value text sm">
               {doc.receivedAt ? dateTime(doc.receivedAt) : "Not yet"}
             </div>
           </div>

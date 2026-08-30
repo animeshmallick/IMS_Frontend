@@ -171,7 +171,7 @@ export function AdjustmentDetailPage() {
         <Card>
           <div className="stat">
             <div className="label">Raised</div>
-            <div className="value" style={{ fontSize: "1rem" }}>
+            <div className="value text sm">
               {dateTime(doc.createdAt)}
             </div>
           </div>
@@ -179,7 +179,7 @@ export function AdjustmentDetailPage() {
         <Card>
           <div className="stat">
             <div className="label">Approved</div>
-            <div className="value" style={{ fontSize: "1rem" }}>
+            <div className="value text sm">
               {doc.approvedAt ? dateTime(doc.approvedAt) : "Not yet"}
             </div>
           </div>
@@ -187,7 +187,7 @@ export function AdjustmentDetailPage() {
         <Card>
           <div className="stat">
             <div className="label">Posted</div>
-            <div className="value" style={{ fontSize: "1rem" }}>
+            <div className="value text sm">
               {doc.postedAt ? dateTime(doc.postedAt) : "Not yet"}
             </div>
           </div>
@@ -219,7 +219,7 @@ export function AdjustmentDetailPage() {
                   {line.expiresOn ? <span className="sub">expires {date(line.expiresOn)}</span> : null}
                 </td>
                 <td className="num">
-                  <strong style={{ color: delta < 0 ? "var(--danger)" : "var(--success)" }}>
+                  <strong className={delta < 0 ? "text-danger" : "text-success"}>
                     {delta > 0 ? "+" : ""}
                     {qty(line.qtyDelta)}
                   </strong>

@@ -141,8 +141,7 @@ export function Replenishment() {
             <option value={14}>2 weeks</option>
           </select>
         </Field>
-        <Field label=" ">
-          <label className="row small">
+        <label className="check">
             <input
               type="checkbox"
               checked={includeHealthy}
@@ -150,7 +149,6 @@ export function Replenishment() {
             />
             Show items that are fine
           </label>
-        </Field>
       </div>
 
       {can("po:write") && (drafts.data?.drafts.length ?? 0) > 0 ? (
@@ -220,10 +218,9 @@ export function Replenishment() {
                     <span className="muted">not selling</span>
                   ) : (
                     <span
-                      style={{
-                        color:
-                          Number(row.daysOfCover) < row.leadTimeDays ? "var(--danger)" : undefined,
-                      }}
+                      className={
+                        Number(row.daysOfCover) < row.leadTimeDays ? "text-danger" : undefined
+                      }
                     >
                       {qty(row.daysOfCover)} d
                     </span>

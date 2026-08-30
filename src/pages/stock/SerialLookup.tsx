@@ -114,7 +114,7 @@ export function SerialLookup() {
             <Card>
               <div className="stat">
                 <div className="label">Warranty</div>
-                <div className="value" style={{ fontSize: "1.3rem" }}>
+                <div className="value text">
                   {unit.warrantyExpiresOn === null ? (
                     <Badge tone="neutral">None recorded</Badge>
                   ) : unit.underWarranty ? (
@@ -136,7 +136,7 @@ export function SerialLookup() {
             <Card>
               <div className="stat">
                 <div className="label">Sold</div>
-                <div className="value" style={{ fontSize: "1.1rem" }}>
+                <div className="value text">
                   {unit.sale ? date(unit.sale.placedAt) : humanise(unit.status)}
                 </div>
                 <div className="hint">
@@ -154,7 +154,7 @@ export function SerialLookup() {
             <Card>
               <div className="stat">
                 <div className="label">Product</div>
-                <div className="value" style={{ fontSize: "1.1rem" }}>
+                <div className="value text">
                   {unit.sku}
                 </div>
                 <div className="hint">{unit.productName}</div>

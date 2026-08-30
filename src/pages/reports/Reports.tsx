@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useApi } from "../../lib/hooks";
 import { useSessionContext } from "../../lib/session";
 import { Card, Empty, Field, PageHead, QueryState, Table } from "../../components/ui";
+import { SkeletonStats } from "../../components/feedback";
 import { date, humanise, money, qty, toDateInput } from "../../lib/format";
 import type {
   ExpiringBatch,
@@ -124,6 +125,12 @@ export function Reports() {
           </select>
         </Field>
       </div>
+
+      {financial && summary.isPending ? (
+        <div className="mb">
+          <SkeletonStats count={4} />
+        </div>
+      ) : null}
 
       {financial ? (
         <div className="grid cols-4 mb">

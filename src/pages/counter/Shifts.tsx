@@ -129,7 +129,7 @@ export function Shifts() {
             </div>
             <div className="stat">
               <div className="label">Opened</div>
-              <div className="value" style={{ fontSize: "1rem" }}>
+              <div className="value text sm">
                 {dateTime(current.openedAt)}
               </div>
             </div>
@@ -188,7 +188,7 @@ export function Shifts() {
                 </div>
                 <div className="stat">
                   <div className="label">Variance</div>
-                  <div className="value" style={{ color: variance === 0 ? undefined : "var(--danger)" }}>
+                  <div className={variance === 0 ? "value" : "value text-danger"}>
                     {money(current.cashVariance)}
                   </div>
                   <div className="hint">{current.varianceReason ?? ""}</div>
@@ -230,7 +230,7 @@ export function Shifts() {
             {Object.entries(summary.data).map(([key, value]) => (
               <div className="stat" key={key}>
                 <div className="label">{humanise(key.replace(/([A-Z])/g, " $1").toLowerCase())}</div>
-                <div className="value" style={{ fontSize: "1.15rem" }}>
+                <div className="value text">
                   {typeof value === "number"
                     ? value
                     : /^-?\d+(\.\d+)?$/.test(String(value))
