@@ -1,5 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import {
+  decodeInStoreLabel,
+  gramsToQty,
+  looksLikeInStoreLabel,
+} from "../../lib/weighed-barcode";
 import { useApi, useInvalidate } from "../../lib/hooks";
 import { useSessionContext } from "../../lib/session";
 import { useOffline } from "../../lib/offline";
@@ -332,7 +337,13 @@ export function Counter() {
             <div className="pos-scan" ref={scanRef}>
               {offlineMode ? (
                 <OfflinePicker
-                  onPick={(item) => (item.isDivisible ? setWeighing(item) : void addItem(item))}
+                  onPick={(item, qty) => {
+                    // A quantity means the scan was a printed label and the bag
+                    // has already been weighed — asking again would be a second
+                    // chance to get it wrong.
+                    if (qty) return void addItem(item, qty);
+                    return item.isDivisible ? setWeighing(item) : void addItem(item);
+                  }}
                 />
               ) : (
                 <VariantPicker
@@ -667,11 +678,74 @@ function ConnectionBanner() {
 /* ------------------------------------------------------------ offline picker */
 
 /** Search the cached catalogue. Same keyboard behaviour as the online picker. */
-function OfflinePicker({ onPick }: { onPick: (item: PickedItem) => void }) {
+function OfflinePicker({
+  onPick,
+}: {
+  onPick: (item: PickedItem, qty?: string) => void;
+}) {
   const { lookup, catalogue } = useOffline();
   const [term, setTerm] = useState("");
+  const [labelError, setLabelError] = useState<string | null>(null);
 
   const results = lookup(term);
+
+  /*
+   * A printed weight label, resolved without the server.
+   *
+   * The barcode carries the item code and the weight; the cached price list
+   * carries everything else. Loose goods are exactly what a shop is selling
+   * when the line drops, so an offline till that could not read its own labels
+   * would fail at precisely the wrong moment.
+   *
+   * Returns true when the scan was handled, so the caller stops.
+   */
+  function tryLabel(raw: string): boolean {
+    if (!looksLikeInStoreLabel(raw)) return false;
+
+    const decoded = decodeInStoreLabel(raw);
+    if (!decoded) return false;
+
+    const item = catalogue.find((entry) => entry.plu === decoded.plu);
+    if (!item) {
+      /*
+       * The label is well formed but names a SKU this till has never cached.
+       * Saying so is much better than "no results": the cashier is holding a
+       * real bag, and the fix — reconnect and refresh the price list — is not
+       * something they would guess.
+       */
+      setLabelError(
+        `Label ${decoded.plu} is not in this till's cached price list. Reconnect to refresh it.`,
+      );
+      return true;
+    }
+
+    if (decoded.kind === "price") {
+      /*
+       * A price label needs dividing by the unit price to get a quantity, and
+       * that division has to happen in decimal arithmetic, not a browser float,
+       * or the ledger stops balancing. Refusing offline is the honest answer;
+       * weight labels, which are what this system prints, work fine.
+       */
+      setLabelError("Price labels cannot be read offline. Use a weight label, or reconnect.");
+      return true;
+    }
+
+    setLabelError(null);
+    onPick(
+      {
+        variantId: item.variantId,
+        sku: item.sku,
+        productName: item.productName,
+        stockUomId: item.stockUomId,
+        stockUomCode: item.stockUomCode,
+        isDivisible: item.isDivisible,
+        price: item.price,
+      },
+      gramsToQty(decoded.value),
+    );
+    setTerm("");
+    return true;
+  }
 
   function pick(item: CachedItem) {
     onPick({
@@ -700,14 +774,22 @@ function OfflinePicker({ onPick }: { onPick: (item: PickedItem) => void }) {
         autoFocus
         value={term}
         placeholder="Scan a barcode, or type a name or SKU"
-        onChange={(event) => setTerm(event.target.value)}
+        onChange={(event) => {
+          setTerm(event.target.value);
+          setLabelError(null);
+        }}
         onKeyDown={(event) => {
           if (event.key !== "Enter") return;
           event.preventDefault();
+          // Our own labels first; a manufacturer barcode falls through to the
+          // cached list, so one scan works for both.
+          if (tryLabel(term.trim())) return;
           // A scanner ends with Enter. One result means nothing to choose between.
           if (results.length === 1) pick(results[0]!);
         }}
       />
+
+      {labelError ? <div className="alert warn mt">{labelError}</div> : null}
 
       {results.length > 0 ? (
         <div className="search-results">

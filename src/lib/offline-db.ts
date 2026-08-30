@@ -32,6 +32,14 @@ export interface CachedItem {
   stockUomCode: string;
   isDivisible: boolean;
   trackExpiry: boolean;
+  /**
+   * In-store item code, present only for SKUs that have had a label printed.
+   *
+   * Carried in the snapshot so a printed weight label still scans with the
+   * connection down: the weight is inside the barcode and the price is already
+   * cached, so resolving one needs nothing from the server.
+   */
+  plu: number | null;
   price: string;
   mrp: string | null;
   /** Advisory only: a snapshot that goes stale the moment another till sells. */
