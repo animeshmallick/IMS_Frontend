@@ -10,6 +10,7 @@ import {
   Loading,
   Modal,
   PageHead,
+  SelectField,
   Table,
   TextField,
 } from "../../components/ui";
@@ -27,6 +28,8 @@ import type { ProductDetail, ProductVariantDetail, Uom } from "../../lib/types";
 export function ProductDetailPage() {
   const { id } = useParams<{ id: string }>();
   const { can } = useSessionContext();
+  const [editing, setEditing] = useState(false);
+  const [addingSku, setAddingSku] = useState(false);
   const [barcoding, setBarcoding] = useState<ProductVariantDetail | null>(null);
   const [pricing, setPricing] = useState<ProductVariantDetail | null>(null);
   const [converting, setConverting] = useState<ProductVariantDetail | null>(null);
@@ -48,9 +51,21 @@ export function ProductDetailPage() {
           </>
         }
         actions={
-          <Badge tone={item.status === "active" ? "success" : "neutral"}>
-            {humanise(item.status)}
-          </Badge>
+          <>
+            <Badge tone={item.status === "active" ? "success" : "neutral"}>
+              {humanise(item.status)}
+            </Badge>
+            {can("catalog:write") ? (
+              <>
+                <button type="button" onClick={() => setEditing(true)}>
+                  Edit product
+                </button>
+                <button type="button" className="primary" onClick={() => setAddingSku(true)}>
+                  Add SKU
+                </button>
+              </>
+            ) : null}
+          </>
         }
       />
 
@@ -171,6 +186,14 @@ export function ProductDetailPage() {
         <Card title="Description">
           <p>{item.description}</p>
         </Card>
+      ) : null}
+
+      {editing ? (
+        <EditProduct item={item} onClose={() => setEditing(false)} />
+      ) : null}
+
+      {addingSku ? (
+        <AddSku item={item} onClose={() => setAddingSku(false)} />
       ) : null}
 
       {barcoding ? (
@@ -568,6 +591,318 @@ function BarcodeDialog({ variant, onClose }: { variant: ProductVariantDetail; on
       >
         Create one for this item
       </button>
+    </Modal>
+  );
+}
+
+/**
+ * Correct a product.
+ *
+ * Deliberately narrow. Three things are NOT here, and each absence is a
+ * decision rather than an omission:
+ *
+ *   The stock unit. Every ledger entry for this product is denominated in it,
+ *   so changing it would restate history — a hundred grams recorded last month
+ *   would silently become a hundred kilograms. It is fixed at creation.
+ *
+ *   The code. It is the identifier suppliers and purchase orders refer to.
+ *
+ *   Price, which lives behind its own permission on each SKU: deciding what
+ *   something sells for is a different call from correcting its description,
+ *   and the people trusted with one are not automatically trusted with the
+ *   other.
+ */
+function EditProduct({ item, onClose }: { item: ProductDetail; onClose: () => void }) {
+  const [name, setName] = useState(item.name);
+  const [description, setDescription] = useState(item.description ?? "");
+  const [categoryId, setCategoryId] = useState(item.categoryId);
+  const [brandId, setBrandId] = useState(item.brandId ?? "");
+  const [status, setStatus] = useState(item.status);
+  const [isDivisible, setIsDivisible] = useState(item.isDivisible);
+
+  const categories = useApi<{ id: string; name: string; path: string; depth: number }[]>(
+    ["catalog", "categories"],
+    "/catalog/categories",
+  );
+  const brands = useApi<{ id: string; name: string }[]>(["catalog", "brands"], "/catalog/brands");
+
+  const save = useApiMutation<Record<string, unknown>, unknown>(
+    `/catalog/products/${item.id}`,
+    { method: "PATCH", invalidate: [["catalog"]], onSuccess: onClose },
+  );
+
+  const archive = useApiMutation<undefined, unknown>(`/catalog/products/${item.id}`, {
+    method: "DELETE",
+    invalidate: [["catalog"]],
+    onSuccess: onClose,
+  });
+
+  return (
+    <Modal
+      title={`Edit ${item.name}`}
+      onClose={onClose}
+      footer={
+        <>
+          <button type="button" onClick={onClose}>
+            Cancel
+          </button>
+          <button
+            type="button"
+            className="primary"
+            disabled={!name.trim() || save.isPending}
+            onClick={() =>
+              save.mutate({
+                name: name.trim(),
+                description: description.trim() || undefined,
+                categoryId,
+                // Explicit null clears the brand. Omitting it would mean "leave
+                // it alone", which is a different intention.
+                brandId: brandId || null,
+                status,
+                isDivisible,
+              })
+            }
+          >
+            Save
+          </button>
+        </>
+      }
+    >
+      <ErrorBanner error={save.error ?? archive.error} />
+
+      <TextField label="Name" value={name} onChange={(e) => setName(e.target.value)} />
+
+      <Field label="Description">
+        <textarea value={description} onChange={(e) => setDescription(e.target.value)} />
+      </Field>
+
+      <div className="grid cols-2">
+        <SelectField
+          label="Category"
+          value={categoryId}
+          onChange={(e) => setCategoryId(e.target.value)}
+        >
+          {(categories.data ?? []).map((c) => (
+            <option key={c.id} value={c.id}>
+              {"\u00A0".repeat(c.depth * 2)}
+              {c.name}
+            </option>
+          ))}
+        </SelectField>
+
+        <SelectField label="Brand" value={brandId} onChange={(e) => setBrandId(e.target.value)}>
+          <option value="">No brand</option>
+          {(brands.data ?? []).map((b) => (
+            <option key={b.id} value={b.id}>
+              {b.name}
+            </option>
+          ))}
+        </SelectField>
+      </div>
+
+      <SelectField
+        label="Status"
+        value={status}
+        onChange={(e) => setStatus(e.target.value as typeof status)}
+        help="Discontinued keeps existing stock sellable but hides it when adding to documents"
+      >
+        <option value="draft">Draft</option>
+        <option value="active">Active</option>
+        <option value="discontinued">Discontinued</option>
+      </SelectField>
+
+      <label className="check mt">
+        <input
+          type="checkbox"
+          checked={isDivisible}
+          onChange={(e) => setIsDivisible(e.target.checked)}
+        />
+        Sold in fractions
+      </label>
+      <p className="hint">
+        {/*
+          * The server refuses to turn this off while fractional stock exists,
+          * so saying so up front turns a rejected save into an expected one.
+          */}
+        Turning this off is refused while any fractional stock is still on hand.
+      </p>
+
+      <div className="alert info mt">
+        <div>
+          The stock unit (<strong>{item.stockUomCode}</strong>) and the code (
+          <strong className="mono">{item.code}</strong>) cannot be changed. Every ledger entry is
+          recorded in that unit, so changing it would restate history rather than correct it.
+        </div>
+      </div>
+
+      <hr />
+
+      <h3>Take out of use</h3>
+      <p className="hint">
+        Refused while any stock remains. An archived product disappears from search, and stock
+        nobody can find is worse than a tidy catalogue is good.
+      </p>
+      <button
+        type="button"
+        className="danger"
+        disabled={archive.isPending}
+        onClick={() => archive.mutate(undefined)}
+      >
+        Archive this product
+      </button>
+    </Modal>
+  );
+}
+
+/**
+ * Another SKU under the same product.
+ *
+ * A product is the thing; a SKU is the version you actually stock and sell —
+ * 500 g and 1 kg of the same atta, or the red and blue of the same shirt. They
+ * share a name, a category, a stock unit and a set of attributes, and differ in
+ * price, barcode and how much is on the shelf.
+ *
+ * Everything except the distinguishing name is optional, because the useful
+ * moment to add one is while you are looking at the product and thinking "there
+ * is also a large size" — not after assembling a full specification.
+ */
+function AddSku({ item, onClose }: { item: ProductDetail; onClose: () => void }) {
+  const [variantName, setVariantName] = useState("");
+  const [sku, setSku] = useState("");
+  const [price, setPrice] = useState("");
+  const [mrp, setMrp] = useState("");
+  const [barcode, setBarcode] = useState("");
+  const [reorderPoint, setReorderPoint] = useState("");
+  /** Stay open for the next one — sizes and colours arrive in runs. */
+  const [addAnother, setAddAnother] = useState(true);
+  const [added, setAdded] = useState<string[]>([]);
+
+  const create = useApiMutation<Record<string, unknown>, unknown>(
+    `/catalog/products/${item.id}/variants`,
+    {
+      invalidate: [["catalog"]],
+      onSuccess: () => {
+        setAdded((current) => [...current, variantName || sku || "SKU"]);
+        if (!addAnother) {
+          onClose();
+          return;
+        }
+        // Keep the price, which is usually the same across sizes; clear what
+        // must differ, so the next one cannot silently inherit a barcode.
+        setVariantName("");
+        setSku("");
+        setBarcode("");
+      },
+    },
+  );
+
+  return (
+    <Modal
+      title={`Add a SKU to ${item.name}`}
+      onClose={onClose}
+      footer={
+        <>
+          <button type="button" onClick={onClose}>
+            {added.length > 0 ? "Done" : "Cancel"}
+          </button>
+          <button
+            type="button"
+            className="primary"
+            disabled={create.isPending}
+            onClick={() =>
+              create.mutate({
+                variantName: variantName.trim() || undefined,
+                sku: sku.trim() || undefined,
+                price: price.trim() || undefined,
+                mrp: mrp.trim() || undefined,
+                reorderPoint: reorderPoint.trim() || undefined,
+                barcodes: barcode.trim()
+                  ? [{ barcode: barcode.trim(), isPrimary: true }]
+                  : undefined,
+              })
+            }
+          >
+            Add
+          </button>
+        </>
+      }
+    >
+      <ErrorBanner error={create.error} />
+
+      {added.length > 0 ? (
+        <div className="alert success">
+          <div>
+            Added {added.length}: {added.join(", ")}
+          </div>
+        </div>
+      ) : null}
+
+      <div className="grid cols-2">
+        <TextField
+          label="Variant name"
+          value={variantName}
+          placeholder="1 kg, Red / L"
+          onChange={(e) => setVariantName(e.target.value)}
+          help="What tells this one apart"
+        />
+        <TextField
+          label="SKU code"
+          className="mono"
+          value={sku}
+          placeholder="Leave blank to generate"
+          onChange={(e) => setSku(e.target.value)}
+          help={`Generated from ${item.code} if empty`}
+        />
+      </div>
+
+      <div className="grid cols-2">
+        <TextField
+          label={`Price per ${item.stockUomCode}`}
+          className="num"
+          inputMode="decimal"
+          value={price}
+          onChange={(e) => setPrice(e.target.value)}
+        />
+        <TextField
+          label="MRP"
+          className="num"
+          inputMode="decimal"
+          value={mrp}
+          onChange={(e) => setMrp(e.target.value)}
+        />
+      </div>
+
+      {/*
+        * Optional, and it should be. A product being stocked for the first time
+        * has not arrived yet, so nobody has seen the packet — the barcode is
+        * captured at receiving, or generated if it will never have one.
+        */}
+      <TextField
+        label="Barcode"
+        className="mono"
+        value={barcode}
+        placeholder="Scan it, or leave blank"
+        onChange={(e) => setBarcode(e.target.value)}
+        help="Leave blank if the goods have not arrived yet — scan it when they do"
+      />
+
+      <TextField
+        label={`Reorder point (${item.stockUomCode})`}
+        className="num"
+        inputMode="decimal"
+        value={reorderPoint}
+        onChange={(e) => setReorderPoint(e.target.value)}
+        help="Optional. Replenishment works it out from sales if left blank."
+      />
+
+      <label className="check mt">
+        <input
+          type="checkbox"
+          checked={addAnother}
+          onChange={(e) => setAddAnother(e.target.checked)}
+        />
+        Keep this open for the next SKU
+      </label>
     </Modal>
   );
 }
