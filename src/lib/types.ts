@@ -178,6 +178,8 @@ export interface LedgerEntry {
   qtyDelta: string;
   unitCost: string;
   balanceAfter: string;
+  /** The unit the quantities above are in. */
+  stockUomCode: string;
   movementType: string;
   documentType: string | null;
   documentId: string | null;
@@ -389,6 +391,8 @@ export interface TransferLine {
   dispatchedQty: string;
   receivedQty: string;
   shortageQty: string;
+  /** The unit the quantities above are in. */
+  stockUomCode: string;
   shortageReason: string | null;
   notes: string | null;
 }

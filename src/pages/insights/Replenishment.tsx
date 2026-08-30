@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useApi, useApiMutation } from "../../lib/hooks";
 import { useSessionContext } from "../../lib/session";
+import { useUnits } from "../../lib/use-units";
 import {
   Badge,
   Card,
@@ -73,6 +74,7 @@ const URGENCY: Record<ReplenishmentRow["urgency"], { tone: "danger" | "warn" | "
  */
 export function Replenishment() {
   const { can, activeLocation } = useSessionContext();
+  const units = useUnits();
   const [locationId, setLocationId] = useState(activeLocation?.id ?? "");
   const [windowDays, setWindowDays] = useState(90);
   const [coverDays, setCoverDays] = useState(30);
@@ -207,7 +209,7 @@ export function Replenishment() {
                 </td>
                 <td className="small">{row.locationName}</td>
                 <td className="num">
-                  {qty(row.available)} <span className="muted small">{row.stockUomCode}</span>
+                  {units.format(row.available, row.stockUomCode)} <span className="muted small">{row.stockUomCode}</span>
                 </td>
                 <td className="num muted">
                   {Number(row.onOrder) > 0 ? qty(row.onOrder) : "—"}
@@ -228,14 +230,14 @@ export function Replenishment() {
                   )}
                 </td>
                 <td className="num">
-                  {qty(row.reorderPoint)}
+                  {units.format(row.reorderPoint, row.stockUomCode)}
                   <span className="sub">
                     {row.reorderPointSource === "computed" ? "computed" : "set by hand"}
                   </span>
                 </td>
                 <td className="num">
                   {Number(row.suggestedQty) > 0 ? (
-                    <strong>{qty(row.suggestedQty)}</strong>
+                    <strong>{units.format(row.suggestedQty, row.stockUomCode)}</strong>
                   ) : (
                     <span className="muted">—</span>
                   )}

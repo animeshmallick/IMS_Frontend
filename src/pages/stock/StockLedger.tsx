@@ -1,8 +1,9 @@
 import { useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { useApi, useApiList } from "../../lib/hooks";
+import { useUnits } from "../../lib/use-units";
 import { Badge, Card, Empty, Field, PageHead, Pager, QueryState, Table } from "../../components/ui";
-import { dateTime, humanise, money, qty } from "../../lib/format";
+import { dateTime, humanise, money} from "../../lib/format";
 import type { LedgerEntry, Location } from "../../lib/types";
 
 const MOVEMENT_TYPES = [
@@ -28,6 +29,7 @@ const MOVEMENT_TYPES = [
  * disputed.
  */
 export function StockLedger() {
+  const units = useUnits();
   const [params] = useSearchParams();
   const [variantId] = useState(params.get("variantId") ?? "");
   const [locationId, setLocationId] = useState("");
@@ -136,11 +138,11 @@ export function StockLedger() {
                   <td className="num">
                     <strong style={{ color: inward ? "var(--success)" : "var(--danger)" }}>
                       {inward ? "+" : ""}
-                      {qty(entry.qtyDelta)}
+                      {units.format(entry.qtyDelta, entry.stockUomCode)}
                     </strong>
                   </td>
                   <td className="num muted">
-                    {entry.locationIsPhysical ? qty(entry.balanceAfter) : "—"}
+                    {entry.locationIsPhysical ? units.format(entry.balanceAfter, entry.stockUomCode) : "—"}
                   </td>
                   <td className="num muted">{money(entry.unitCost)}</td>
                 </tr>

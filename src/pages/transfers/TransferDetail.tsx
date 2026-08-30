@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useParams } from "react-router-dom";
 import { useApi, useApiMutation } from "../../lib/hooks";
 import { useSessionContext } from "../../lib/session";
+import { useUnits } from "../../lib/use-units";
 import {
   Badge,
   Card,
@@ -27,6 +28,7 @@ import type { TransferDetail } from "../../lib/types";
 export function TransferDetailPage() {
   const { id } = useParams<{ id: string }>();
   const { can } = useSessionContext();
+  const units = useUnits();
   const [received, setReceived] = useState<Record<string, string>>({});
   const [reason, setReason] = useState("");
 
@@ -207,10 +209,10 @@ export function TransferDetailPage() {
                   {line.batchCode ?? <span className="muted">chosen at dispatch</span>}
                   {line.expiresOn ? <span className="sub">expires {date(line.expiresOn)}</span> : null}
                 </td>
-                <td className="num">{qty(line.requestedQty)}</td>
-                <td className="num">{qty(line.dispatchedQty)}</td>
+                <td className="num">{units.format(line.requestedQty, line.stockUomCode)}</td>
+                <td className="num">{units.format(line.dispatchedQty, line.stockUomCode)}</td>
                 <td className="num">
-                  {qty(line.receivedQty)}
+                  {units.format(line.receivedQty, line.stockUomCode)}
                   {pending > 0 && doc.status !== "draft" ? (
                     <span className="sub">
                       <Badge tone="warn">{qty(String(pending))} outstanding</Badge>
