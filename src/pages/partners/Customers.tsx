@@ -134,6 +134,11 @@ function CustomerModal({
   const [email, setEmail] = useState(customer?.email ?? "");
   const [creditLimit, setCreditLimit] = useState(customer?.creditLimit ?? "");
 
+  const archive = useApiMutation<undefined, unknown>(
+    `/partners/customers/${customer?.id}`,
+    { method: "DELETE", invalidate: [["partners"]], onSuccess: onDone },
+  );
+
   const save = useApiMutation<Record<string, unknown>, unknown>(
     customer ? `/partners/customers/${customer.id}` : "/partners/customers",
     {
@@ -186,6 +191,22 @@ function CustomerModal({
         value={creditLimit}
         onChange={(e) => setCreditLimit(e.target.value)}
       />
+      {customer ? (
+        <>
+          <hr />
+          <h3>Take out of use</h3>
+          <p className="hint">Past bills keep their own record of who they were for, so history is unaffected. Refused only while they hold store credit — archiving somebody the shop owes money would hide the liability until they walk in with the credit note.</p>
+          <ErrorBanner error={archive.error} />
+          <button
+            type="button"
+            className="danger"
+            disabled={archive.isPending}
+            onClick={() => archive.mutate(undefined)}
+          >
+            Archive this customer
+          </button>
+        </>
+      ) : null}
     </Modal>
   );
 }

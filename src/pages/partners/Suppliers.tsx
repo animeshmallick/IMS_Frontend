@@ -151,6 +151,11 @@ function SupplierModal({
   const [paymentTerms, setTerms] = useState(supplier?.paymentTerms ?? "");
   const [isActive, setActive] = useState(supplier?.isActive ?? true);
 
+  const archive = useApiMutation<undefined, unknown>(
+    `/partners/suppliers/${supplier?.id}`,
+    { method: "DELETE", invalidate: [["partners"]], onSuccess: onDone },
+  );
+
   const save = useApiMutation<Record<string, unknown>, unknown>(
     supplier ? `/partners/suppliers/${supplier.id}` : "/partners/suppliers",
     {
@@ -232,6 +237,22 @@ function SupplierModal({
           <input type="checkbox" checked={isActive} onChange={(e) => setActive(e.target.checked)} />
           Active
         </label>
+      ) : null}
+      {supplier ? (
+        <>
+          <hr />
+          <h3>Take out of use</h3>
+          <p className="hint">They stop appearing when raising a purchase order, but every order ever placed with them keeps showing the name. Refused while any purchase order with them is still open — an outstanding delivery nobody is chasing is worse than a long supplier list.</p>
+          <ErrorBanner error={archive.error} />
+          <button
+            type="button"
+            className="danger"
+            disabled={archive.isPending}
+            onClick={() => archive.mutate(undefined)}
+          >
+            Archive this supplier
+          </button>
+        </>
       ) : null}
     </Modal>
   );
