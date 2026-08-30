@@ -299,18 +299,18 @@ function OneLabel({ label, grams }: { label: LabelData; grams: number }) {
   const price = label.price ? (Number(label.price) * grams).toFixed(2) : null;
 
   return (
-    <div className="label">
-      <div className="label-name">
+    <div className="print-label">
+      <div className="print-label-name">
         {label.productName}
         {label.variantName ? ` · ${label.variantName}` : ""}
       </div>
-      <div className="label-row">
+      <div className="print-label-row">
         <span>
           {grams >= 1000 ? `${(grams / 1000).toFixed(3)} kg` : `${grams} g`}
         </span>
-        {price ? <strong className="label-price">{money(price)}</strong> : null}
+        {price ? <strong className="print-label-price">{money(price)}</strong> : null}
       </div>
-      <svg ref={svgRef} className="label-barcode" />
+      <svg ref={svgRef} className="print-label-barcode" />
     </div>
   );
 }

@@ -114,7 +114,7 @@ export function SystemHealth() {
       <QueryState query={health}>
         <div className="grid cols-4 mb">
           <Card>
-            <div className="stat">
+            <div className={`stat ${data?.database === "connected" ? "good" : "critical"}`}>
               <div className="label">Database</div>
               <div className="value text">
                 <Badge tone={data?.database === "connected" ? "success" : "danger"}>
@@ -125,7 +125,7 @@ export function SystemHealth() {
           </Card>
 
           <Card>
-            <div className="stat">
+            <div className={`stat ${integrityOk ? "good" : "critical"}`}>
               <div className="label">Books balance</div>
               <div className="value text">
                 <Badge tone={integrityOk ? "success" : "danger"}>
@@ -137,7 +137,7 @@ export function SystemHealth() {
           </Card>
 
           <Card>
-            <div className="stat">
+            <div className={`stat ${(data?.alertsPending ?? 0) > 0 ? "attention" : ""}`}>
               <div className="label">Alerts waiting</div>
               <div className="value">{data?.alertsPending ?? 0}</div>
               <div className="hint">
