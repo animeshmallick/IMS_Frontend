@@ -43,22 +43,50 @@ export type ListResult<T> = {
 };
 
 /**
- * A list endpoint returns `{ data, meta }`, and `api()` unwraps only `data`.
- * This keeps the pager's `total` by reading the envelope itself.
+ * Turn whatever a list endpoint returned into one shape.
  *
- * Three shapes reach here and all three are normalised:
+ * Three envelopes reach here, because the API grew that way and rewriting every
+ * endpoint to agree would be a larger change than teaching the client to cope:
  *
- *   T[]                                   — an unpaginated list
- *   { data: T[], meta: { total } }        — the shared `page()` envelope
- *   { data: { items: T[], hasMore } }     — endpoints that cannot afford a count
+ *   T[]                                 an unpaginated list
+ *   { data: T[], meta: { total } }      the shared page() envelope
+ *   { data: { items, hasMore } }        endpoints that cannot afford a count
  *
- * `items` is guaranteed to be an array. That guarantee is the point: every
- * caller ends in `.map`, so a shape this function does not recognise used to
- * take the whole screen down with "map is not a function" — an error that names
- * the component and says nothing about the endpoint that actually caused it.
- * An unrecognised shape now renders an empty list instead, which is wrong but
- * legible, and leaves the page working.
+ * `items` is ALWAYS an array. That guarantee is the whole point, not a
+ * convenience: every caller ends in `.map`, so an unrecognised shape used to
+ * take the entire screen down with "map is not a function" — an error naming
+ * the component and saying nothing about the endpoint that caused it. An
+ * unknown envelope now renders an empty list, which is wrong but legible and
+ * leaves the page working.
+ *
+ * Exported for its tests. Pure, so they need no query client and no DOM.
  */
+export function normaliseList<T>(raw: unknown): ListResult<T> {
+  if (Array.isArray(raw)) {
+    return { items: raw as T[], total: raw.length, hasMore: false };
+  }
+
+  const envelope = (raw ?? {}) as {
+    data?: unknown;
+    meta?: { total?: number; limit?: number; offset?: number };
+  };
+
+  if (Array.isArray(envelope.data)) {
+    const items = envelope.data as T[];
+    const total = envelope.meta?.total ?? items.length;
+    const offset = envelope.meta?.offset ?? 0;
+    return { items, total, hasMore: offset + items.length < total };
+  }
+
+  // `{ data: { items, hasMore } }` — a count would be too expensive here.
+  const nested = (envelope.data ?? {}) as { items?: unknown; hasMore?: boolean };
+  if (Array.isArray(nested.items)) {
+    return { items: nested.items as T[], total: null, hasMore: nested.hasMore ?? false };
+  }
+
+  return { items: [], total: 0, hasMore: false };
+}
+
 export function useApiList<T>(
   key: unknown[],
   path: string,
@@ -69,33 +97,7 @@ export function useApiList<T>(
     queryKey: [...key, query ?? null],
     enabled: options?.enabled ?? true,
     staleTime: 15_000,
-    queryFn: async () => {
-      const raw = await api<unknown>(path, { query, rawEnvelope: true });
-
-      if (Array.isArray(raw)) {
-        return { items: raw as T[], total: raw.length, hasMore: false };
-      }
-
-      const envelope = (raw ?? {}) as {
-        data?: unknown;
-        meta?: { total?: number; limit?: number; offset?: number };
-      };
-
-      if (Array.isArray(envelope.data)) {
-        const items = envelope.data as T[];
-        const total = envelope.meta?.total ?? items.length;
-        const offset = envelope.meta?.offset ?? 0;
-        return { items, total, hasMore: offset + items.length < total };
-      }
-
-      // `{ data: { items, hasMore } }` — a count would be too expensive here.
-      const nested = (envelope.data ?? {}) as { items?: unknown; hasMore?: boolean };
-      if (Array.isArray(nested.items)) {
-        return { items: nested.items as T[], total: null, hasMore: nested.hasMore ?? false };
-      }
-
-      return { items: [], total: 0, hasMore: false };
-    },
+    queryFn: async () => normaliseList<T>(await api<unknown>(path, { query, rawEnvelope: true })),
   });
 }
 
