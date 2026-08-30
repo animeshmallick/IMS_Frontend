@@ -8,7 +8,7 @@ import {
   type SelectHTMLAttributes,
 } from "react";
 import { ApiError } from "../lib/api";
-import { SkeletonTable } from "./feedback";
+import { SkeletonPage, SkeletonTable } from "./feedback";
 
 /**
  * Shared presentational pieces.
@@ -187,8 +187,33 @@ export function Empty({
   );
 }
 
-export function Loading({ label = "Loading..." }: { label?: string }) {
-  return <p className="loading">{label}</p>;
+/**
+ * What a screen shows while it is still fetching.
+ *
+ * A skeleton of the page rather than the word "Loading", for the same reason
+ * every list already uses one: it reserves the layout, so the page does not
+ * jump when the data lands, and it says what is coming rather than merely that
+ * something is.
+ *
+ * `label` is kept for callers that pass one and is announced to screen readers;
+ * the shapes themselves are decorative.
+ */
+export function Loading({
+  label = "Loading…",
+  stats = 4,
+  rows = 6,
+}: {
+  label?: string;
+  /** Set 0 for a screen with no figures above its table. */
+  stats?: number;
+  rows?: number;
+}) {
+  return (
+    <>
+      <span className="sr-only">{label}</span>
+      <SkeletonPage stats={stats} rows={rows} />
+    </>
+  );
 }
 
 /**

@@ -224,6 +224,53 @@ export function SkeletonTable({ rows = 6, cols = 5 }: { rows?: number; cols?: nu
   );
 }
 
+/**
+ * A whole screen, in outline, while it loads.
+ *
+ * Nine detail screens rendered the word "Loading..." on an otherwise blank
+ * page: no indication of what was coming, and a hard jump to a full layout
+ * when it arrived. This stands in the shape of the real thing — a heading, a
+ * row of figures, a table — so nothing moves when the data lands and the eye is
+ * already where the content will be.
+ *
+ * `aria-busy` and a live region carry it for anyone not looking at the shapes;
+ * the bars themselves are hidden from the accessibility tree because "grey
+ * rectangle" is not information.
+ */
+export function SkeletonPage({
+  stats = 4,
+  rows = 6,
+}: {
+  stats?: number;
+  rows?: number;
+}) {
+  return (
+    <div aria-busy="true" aria-live="polite">
+      <span className="sr-only">Loading…</span>
+
+      <div className="page-head" aria-hidden="true">
+        <div style={{ flex: 1 }}>
+          <Skeleton width="220px" height="1.25rem" />
+          <div style={{ height: "0.5rem" }} />
+          <Skeleton width="320px" height="0.7rem" />
+        </div>
+        <Skeleton width="110px" height="30px" />
+      </div>
+
+      {stats > 0 ? <SkeletonStats count={stats} /> : null}
+
+      <div className="card" style={{ marginTop: "0.75rem" }} aria-hidden="true">
+        <div className="card-head">
+          <Skeleton width="160px" height="0.85rem" />
+        </div>
+        <div className="card-body flush">
+          <SkeletonTable rows={rows} />
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export function SkeletonStats({ count = 4 }: { count?: number }) {
   return (
     <div className="grid cols-4" aria-busy="true">

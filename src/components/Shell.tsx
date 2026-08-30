@@ -412,6 +412,17 @@ export function Shell() {
       </aside>
 
       <div className="content">
+        {/*
+          * Something is loading, somewhere.
+          *
+          * Rendered only while queries are actually in flight, so it is never a
+          * permanent fixture. It is the app's acknowledgement that a click was
+          * heard — switching outlet in particular refetches every figure on
+          * screen, and without this the only evidence was the numbers changing
+          * a moment later, which reads as nothing having happened.
+          */}
+        {fetching > 0 ? <div className="route-progress" role="presentation" /> : null}
+
         <header className={scrolled ? "topbar scrolled" : "topbar"}>
           <div className="row topbar-left">
             <button

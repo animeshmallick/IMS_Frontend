@@ -151,7 +151,21 @@ const queryClient = new QueryClient({
 function Authenticated() {
   const session = useSessionQuery();
 
-  if (session.isPending) return <p className="loading">Loading...</p>;
+  /*
+   * Before there is a session there is no shell to put a skeleton inside, so
+   * this is the one place a plain loading screen is right. It shows for a few
+   * hundred milliseconds, once per visit.
+   */
+  if (session.isPending) {
+    return (
+      <div className="boot">
+        <span className="mark" aria-hidden>
+          IM
+        </span>
+        <span role="status">Loading your workspace…</span>
+      </div>
+    );
+  }
 
   if (session.isError) {
     const unauthenticated =
