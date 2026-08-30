@@ -714,6 +714,16 @@
 
   /* ---------------------------------------------------------------- topbar */
 
+  /*
+   * The header.
+   *
+   * Present on every screen and read on none of them: it is furniture, and its
+   * job is to stay out of the way while keeping four things reachable — where
+   * am I, where am I working, what needs attention, and the controls. So the
+   * treatment is depth rather than colour, and every effect below is tied to
+   * something real (scroll position, focus, a query in flight) rather than
+   * decorating a static bar.
+   */
   .topbar {
     height: var(--topbar-h);
     display: flex;
@@ -721,22 +731,65 @@
     justify-content: space-between;
     gap: 0.75rem;
     padding: 0 1rem 0 0.75rem;
-    background: color-mix(in srgb, var(--surface) 88%, transparent);
-    backdrop-filter: blur(10px);
+    /*
+     * A heavier blur and a hair more opacity than before. Content passing under
+     * a translucent bar has to stay unreadable — at 88% with a 10px blur, dense
+     * table text was still legible through it, which reads as a rendering fault
+     * rather than as a layer.
+     */
+    background: color-mix(in srgb, var(--surface) 82%, transparent);
+    backdrop-filter: blur(16px) saturate(140%);
+    -webkit-backdrop-filter: blur(16px) saturate(140%);
     border-bottom: 1px solid transparent;
     position: sticky;
     top: 0;
     z-index: 20;
-    transition: border-color 120ms, box-shadow 120ms;
+    transition: border-color 160ms ease, box-shadow 160ms ease, background 160ms ease;
   }
+
+  /*
+   * A browser without backdrop-filter would show a 82%-opaque bar with the
+   * table scrolling visibly through it. Fall back to an opaque surface: less
+   * pretty, still a header.
+   */
+  @supports not (backdrop-filter: blur(1px)) {
+    .topbar { background: var(--surface); }
+  }
+
   /* Only once content is actually passing underneath does the separation
    * carry information; before that a border is just a seam. */
   .topbar.scrolled {
     border-bottom-color: var(--border-c);
-    box-shadow: var(--shadow-1);
+    box-shadow: var(--shadow-2);
+    background: color-mix(in srgb, var(--surface) 90%, transparent);
   }
 
-  .topbar-left { gap: 0.5rem; min-width: 0; flex-wrap: nowrap; }
+  /*
+   * A hairline of accent along the very bottom edge, drawn only once the page
+   * has scrolled. It is the one place the header says which application this
+   * is, and at 30% over one pixel it registers as an edge rather than a stripe.
+   */
+  .topbar::after {
+    content: "";
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: -1px;
+    height: 1px;
+    background: linear-gradient(
+      90deg,
+      transparent 0%,
+      color-mix(in srgb, var(--accent) 30%, transparent) 18%,
+      color-mix(in srgb, var(--accent) 30%, transparent) 82%,
+      transparent 100%
+    );
+    opacity: 0;
+    transition: opacity 200ms ease;
+    pointer-events: none;
+  }
+  .topbar.scrolled::after { opacity: 1; }
+
+  .topbar-left { gap: 0.375rem; min-width: 0; flex-wrap: nowrap; }
   .topbar-right { gap: 0.375rem; flex: none; flex-wrap: nowrap; }
 
   .topbar-sep {
@@ -763,6 +816,21 @@
     overflow: hidden;
     text-overflow: ellipsis;
   }
+
+  /*
+   * The current crumb slides in when it changes.
+   *
+   * Keyed on the path in the markup, so React remounts it on navigation and the
+   * animation actually replays — without the key it would run once on load and
+   * never again. It is the only thing on screen that confirms a click was
+   * heard while the next screen's data is still arriving, which on a slow
+   * connection is the difference between "loading" and "did that work?".
+   */
+  .crumb-current {
+    animation: crumb-in 220ms ease-out;
+  }
+
+
   @media (width <= 640px) {
     .crumb-group { display: none; }
   }
@@ -784,8 +852,63 @@
     font-weight: 550;
   }
   .location-switch select:hover { background-color: var(--surface-2); }
+  /*
+   * The location's NAME must not wrap.
+   *
+   * When there is only one workable location it renders as plain text rather
+   * than a select, and "Central Warehouse" then wrapped to two lines — which
+   * pushed the header past its fixed 48px height and shoved the controls on the
+   * right off the screen entirely. It truncates instead; the full name is in
+   * the title attribute and on the dashboard.
+   */
+  .location-switch strong {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 22ch;
+  }
+
   @media (width <= 820px) {
     .location-switch label { display: none; }
+    .location-switch strong { max-width: 14ch; }
+  }
+
+  /*
+   * The back arrow is a desktop affordance.
+   *
+   * Phones and tablets have their own back gesture, and a second one competing
+   * for the narrowest header in the app costs more than it gives. The
+   * breadcrumb and the location matter more at this width.
+   */
+  @media (width <= 640px) {
+    .topbar-left > button.icon-only { display: none; }
+
+    /*
+     * The theme toggle goes too.
+     *
+     * Five controls plus a location name do not fit a phone header: the row's
+     * intrinsic width exceeded the viewport and the page scrolled sideways,
+     * which on a screen used one-handed is worse than any of the controls being
+     * a click further away. This is the one that IS a click further away —
+     * appearance is also in the user menu at the foot of the sidebar — so it is
+     * the only one that costs nothing to drop.
+     *
+     * Search stays: ⌘K does not exist on a phone, so the button is the only way
+     * in.
+     */
+    .theme-toggle { display: none; }
+
+    /*
+     * The connection badge keeps its icon and its count, and loses its word.
+     *
+     * "Syncing" was the widest single item left in the header after the
+     * location, and it is the least load-bearing: the badge only appears when
+     * something is wrong, its colour already says which, and the number of
+     * queued bills is the part a cashier acts on. The word stays in the title
+     * attribute for anyone who hovers, and for screen readers.
+     */
+    .conn-label { display: none; }
+    .location-switch strong { max-width: 10ch; }
   }
 
   /* Connection state, shown only when it is not the boring answer. */
@@ -845,7 +968,40 @@
     border: 1.5px solid var(--surface);
   }
 
-  button.icon-only { width: 30px; padding: 0; }
+  /*
+   * A square button holding one glyph.
+   *
+   * The icon carries the whole meaning, so it gets the emphasis: at rest it is
+   * recessive, and on hover it comes up to full ink and lifts a pixel. That
+   * pairing — colour AND movement — is what separates "this is a control" from
+   * "this is a decoration", which matters in a row of five identical squares.
+   */
+  button.icon-only {
+    width: 30px;
+    padding: 0;
+    color: var(--muted);
+    transition: background 140ms ease, color 140ms ease, transform 140ms ease;
+  }
+  button.icon-only:hover:not(:disabled) {
+    color: var(--fg);
+    transform: translateY(-1px);
+  }
+  button.icon-only:active:not(:disabled) { transform: translateY(0); }
+  /* A disabled back arrow is not broken — there is simply nowhere to go — so
+     it recedes rather than looking like a failure. */
+  button.icon-only:disabled { opacity: 0.35; }
+
+  /*
+   * Refreshing.
+   *
+   * The spin is driven by whether queries are actually in flight, so it stops
+   * when the data lands rather than after a fixed interval. A spinner that
+   * finishes early lies; one that runs long makes a fast app feel slow.
+   */
+  button.spinning svg {
+    animation: spin 700ms linear infinite;
+    color: var(--accent);
+  }
 
   .who {
     display: flex;
@@ -2849,6 +3005,7 @@
 @keyframes slide-in { from { opacity: 0; transform: translateX(12px); } }
 @keyframes spin { to { transform: rotate(360deg); } }
 @keyframes sheen { to { transform: translateX(120%); } }
+@keyframes crumb-in { from { opacity: 0; transform: translateX(-4px); } }
 @keyframes rise { from { opacity: 0; transform: translateY(6px); } }
 
 /* ================================================================== print */

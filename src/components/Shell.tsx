@@ -1,7 +1,8 @@
 import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
-import { useQueryClient } from "@tanstack/react-query";
+import { useIsFetching, useQueryClient } from "@tanstack/react-query";
 import {
   Archive,
+  ArrowLeft,
   ArrowLeftRight,
   BadgeCheck,
   BarChart3,
@@ -24,6 +25,7 @@ import {
   PackageMinus,
   Printer,
   Receipt,
+  RefreshCw,
   RotateCcw,
   Ruler,
   ScanBarcode,
@@ -40,7 +42,7 @@ import {
   WifiOff,
 } from "lucide-react";
 import { Suspense, useEffect, useState } from "react";
-import { Link, NavLink, Outlet, useLocation } from "react-router-dom";
+import { Link, NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 import { api } from "../lib/api";
 import { signOut } from "../lib/auth";
 import type { Permission } from "../lib/permissions";
@@ -180,7 +182,18 @@ function initials(name: string): string {
 export function Shell() {
   const { session, activeLocation, canAny } = useSessionContext();
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
   const { pathname } = useLocation();
+
+  /*
+   * How many queries are in flight, anywhere in the app.
+   *
+   * Drives the refresh icon's spin, so it stops when the data has actually
+   * arrived rather than after a fixed delay that is either a lie or a wait.
+   */
+  const fetching = useIsFetching();
+
+
   const { theme, setTheme } = useTheme();
   const offline = useOffline();
   const [menuOpen, setMenuOpen] = useState(false);
@@ -269,6 +282,30 @@ export function Shell() {
   const currentItem = currentGroup?.items
     .filter((item) => pathname === item.to || pathname.startsWith(item.to + "/"))
     .sort((a, b) => b.to.length - a.to.length)[0];
+
+  /*
+   * Where "back" actually goes.
+   *
+   * Not `history.back()`. That returns to whatever was on screen a moment ago,
+   * which after saving a product is the form you just submitted, and after
+   * arriving from a search is the search — neither of which is where the arrow
+   * appears to point. It can also walk out of the application entirely on a
+   * deep link.
+   *
+   * The destination is the PARENT: the navigation entry this screen sits under.
+   * `currentItem` is already the longest nav path matching the URL, so a screen
+   * whose path is exactly that IS the destination and has no parent —
+   * /products, /stock/ledger, the dashboard — while /products/:id and
+   * /products/new both sit under /products and go there.
+   *
+   * Null means no parent, and the button is not rendered at all rather than
+   * shown disabled: a control that never does anything is worse than one that
+   * is not there.
+   */
+  const parent =
+    currentItem && pathname !== currentItem.to
+      ? { to: currentItem.to, label: currentItem.label }
+      : null;
 
   return (
     <div className="shell">
@@ -386,9 +423,36 @@ export function Shell() {
               <Menu size={16} aria-hidden />
             </button>
 
+            {/*
+              * Back to the parent, and absent when there is not one.
+              *
+              * Named in the tooltip — "Back to Products" — because an arrow
+              * that goes somewhere specific should say where before it is
+              * pressed, not after.
+              */}
+            {parent ? (
+              <button
+                type="button"
+                className="ghost sm icon-only"
+                onClick={() => navigate(parent.to)}
+                title={`Back to ${parent.label}`}
+                aria-label={`Back to ${parent.label}`}
+              >
+                <ArrowLeft size={16} aria-hidden />
+              </button>
+            ) : null}
+
             <nav className="crumbs" aria-label="Breadcrumb">
               {currentGroup ? <span className="crumb-group">{currentGroup.heading}</span> : null}
-              <span className="crumb-current">{currentItem?.label ?? "Dashboard"}</span>
+              {/*
+                * Keyed on the path so React remounts it when the route changes
+                * and its entrance animation replays. Without the key the
+                * element is reused, only its text changes, and the animation
+                * runs once on first load and never again.
+                */}
+              <span key={pathname} className="crumb-current">
+                {currentItem?.label ?? "Dashboard"}
+              </span>
             </nav>
 
             <span className="topbar-sep" aria-hidden />
@@ -420,6 +484,29 @@ export function Shell() {
 
           <div className="row topbar-right">
             {/*
+              * Refresh the DATA, not the page.
+              *
+              * `location.reload()` would be the obvious implementation and the
+              * wrong one: it throws away the running application, re-downloads
+              * the bundle, and loses anything half-typed on the screen — a slow
+              * answer to "is this figure current?".
+              *
+              * Invalidating the query cache refetches every query the current
+              * screen is actually using, which is what the question means. The
+              * icon spins while anything is in flight, so the feedback is tied
+              * to real network activity rather than to a timer that guesses.
+              */}
+            <button
+              type="button"
+              className={fetching > 0 ? "ghost sm icon-only spinning" : "ghost sm icon-only"}
+              onClick={() => void queryClient.invalidateQueries()}
+              disabled={fetching > 0}
+              title={fetching > 0 ? "Refreshing…" : "Refresh this screen"}
+              aria-label="Refresh"
+            >
+              <RefreshCw size={15} aria-hidden />
+            </button>
+            {/*
              * Connection state, shown only when it is not the boring answer.
              * A till that has silently dropped offline still takes money, and
              * the cashier needs to know that is what is happening — but a green
@@ -429,13 +516,13 @@ export function Shell() {
             {!offline.online ? (
               <span className="conn offline" title="Working offline — bills are queued locally">
                 <WifiOff size={13} aria-hidden />
-                Offline
+                <span className="conn-label">Offline</span>
                 {offline.pending > 0 ? <span className="conn-count">{offline.pending}</span> : null}
               </span>
             ) : offline.pending > 0 ? (
               <span className="conn syncing" title="Queued bills waiting to sync">
                 <Wifi size={13} aria-hidden />
-                Syncing
+                <span className="conn-label">Syncing</span>
                 <span className="conn-count">{offline.pending}</span>
               </span>
             ) : null}
@@ -468,7 +555,7 @@ export function Shell() {
 
             <button
               type="button"
-              className="ghost sm icon-only"
+              className="ghost sm icon-only theme-toggle"
               aria-label={`Theme: ${theme}. Click to change.`}
               onClick={() =>
                 setTheme(theme === "light" ? "dark" : theme === "dark" ? "system" : "light")
