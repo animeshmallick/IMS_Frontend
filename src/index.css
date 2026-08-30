@@ -1629,6 +1629,58 @@
 
   .print-only { display: none; }
 
+  /* --------------------------------------------------------- barcode sheet */
+
+  /*
+   * A grid that fills a sheet of A4 and keeps every code the same size, because
+   * a scanner is happier with consistent bar widths than with a page that has
+   * been prettily laid out.
+   */
+  .barcode-sheet {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
+    gap: 0.5rem;
+    padding: 0.75rem;
+  }
+
+  .barcode-cell {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    padding: 0.5rem;
+    /* Always white with black bars, in both themes: a scanner reads reflected
+       light, and a dark-mode barcode is unreadable however good it looks. */
+    background: #fff;
+    color: #000;
+    border: 1px solid var(--border-c);
+    border-radius: var(--radius-sm);
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
+  .barcode-name {
+    font-size: 10px;
+    font-weight: 600;
+    line-height: 1.2;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    min-height: 2.4em;
+  }
+
+  .barcode-meta {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: 0.375rem;
+    font-size: 9px;
+    font-variant-numeric: tabular-nums;
+  }
+  .barcode-meta .muted { color: #666; }
+
+  .barcode-svg { width: 100%; height: auto; display: block; }
+
   /* -------------------------------------------------------------- sign-in */
 
   .signin {
@@ -1668,6 +1720,16 @@
 /* ================================================================== print */
 
 @media print {
+  /* The sheet is the page. Filters, navigation and the warning banner are for
+     the person setting it up, not for the counter. */
+  .barcode-sheet {
+    grid-template-columns: repeat(4, 1fr);
+    gap: 3mm;
+    padding: 0;
+  }
+  .barcode-cell { border: 1px solid #999; }
+  .card { break-inside: auto; }
+
   /*
    * When a label sheet is on the page, nothing else goes to the printer. A
    * thermal roll is 50 mm wide and cannot absorb a stray sidebar.

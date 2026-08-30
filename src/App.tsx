@@ -10,6 +10,7 @@ import { Dashboard } from "./pages/Dashboard";
 import { StockOnHand } from "./pages/stock/StockOnHand";
 import { StockLedger } from "./pages/stock/StockLedger";
 import { SerialLookup } from "./pages/stock/SerialLookup";
+import { BarcodeSheet } from "./pages/catalog/BarcodeSheet";
 import { Labels } from "./pages/catalog/Labels";
 import { Units } from "./pages/admin/Units";
 import { Products } from "./pages/catalog/Products";
@@ -288,6 +289,14 @@ function Authenticated() {
             element={
               <RequirePermission permission="catalog:read">
                 <Units />
+              </RequirePermission>
+            }
+          />
+          <Route
+            path="barcodes"
+            element={
+              <RequirePermission permission="catalog:read">
+                <BarcodeSheet />
               </RequirePermission>
             }
           />
