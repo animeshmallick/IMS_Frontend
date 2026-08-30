@@ -7,11 +7,22 @@ import {
   ConfirmButton,
   ErrorBanner,
   Loading,
+  Modal,
   PageHead,
   Table,
 } from "../../components/ui";
-import { date, dateTime, humanise, money, qty, statusTone } from "../../lib/format";
-import type { PurchaseOrderDetail } from "../../lib/types";
+import {
+  date,
+  dateTime,
+  humanise,
+  money,
+  multiplyMoney,
+  qty,
+  statusTone,
+  sumMoney,
+} from "../../lib/format";
+import type { PurchaseOrderDetail, VariantSearchResult } from "../../lib/types";
+import { VariantPicker } from "../../components/VariantPicker";
 import { useState } from "react";
 
 /**
@@ -23,11 +34,267 @@ import { useState } from "react";
  * against. Showing an action the current state forbids just produces a 409 the
  * user cannot act on.
  */
+/**
+ * Edit the lines of an order that has not been sent yet.
+ *
+ * A purchase order is built up over time — items get remembered after the
+ * draft is saved — and until now the only way to add one was to cancel the
+ * order and key the whole thing again. The API replaces the line set wholesale,
+ * so this edits a local copy and submits all of it.
+ *
+ * Existing lines keep the unit they were raised in. Changing a line's pack size
+ * is rare and is the same thing as removing it and adding it back, whereas
+ * offering the choice here would mean fetching every line's configured units
+ * one request at a time.
+ */
+/**
+ * The statuses whose lines may still change — everything before the order is
+ * sent to the supplier. Mirrors the server, which is the authority.
+ */
+const EDITABLE_STATUSES = ["draft", "pending_approval", "approved"];
+
+function EditLines({
+  order,
+  onClose,
+  onDone,
+}: {
+  order: PurchaseOrderDetail;
+  onClose: () => void;
+  onDone: () => void;
+}) {
+  interface Row {
+    variantId: string;
+    sku: string;
+    variantName: string | null;
+    orderUomId: string;
+    orderQty: string;
+    unitCost: string;
+    /** Already delivered against this line, in base units. */
+    receivedQtyBase: string;
+    /** What this SKU may be ordered in: its stock unit, then its pack sizes. */
+    units: { uomId: string; uomCode: string; factorToStockUom: string }[];
+    stockUomId: string;
+    stockUomCode: string;
+  }
+
+  /*
+   * The stock unit always leads, then the configured pack sizes.
+   *
+   * The stock unit needs no conversion row — the server treats a document in it
+   * as a 1:1 — so it is prepended rather than expected in the list.
+   */
+  const unitsFor = (
+    stockUomId: string,
+    stockUomCode: string,
+    conversions: { uomId: string; uomCode: string; factorToStockUom: string }[],
+  ) => [
+    { uomId: stockUomId, uomCode: stockUomCode, factorToStockUom: "1" },
+    ...conversions.map((c) => ({
+      uomId: c.uomId,
+      uomCode: c.uomCode,
+      factorToStockUom: c.factorToStockUom,
+    })),
+  ];
+
+  const [rows, setRows] = useState<Row[]>(() =>
+    order.lines.map((line) => ({
+      variantId: line.variantId,
+      sku: line.sku,
+      variantName: line.variantName,
+      orderUomId: line.orderUomId,
+      orderQty: line.orderQty,
+      unitCost: line.unitCost,
+      receivedQtyBase: line.receivedQtyBase,
+      units: unitsFor(line.stockUomId, line.stockUomCode, line.orderUnits ?? []),
+      stockUomId: line.stockUomId,
+      stockUomCode: line.stockUomCode,
+    })),
+  );
+
+  const save = useApiMutation<{ lines: unknown[] }, unknown>(
+    `/purchase-orders/${order.id}/lines`,
+    // PUT: the endpoint replaces the whole line set rather than appending.
+    { method: "PUT", invalidate: [["purchase-orders"]], onSuccess: onDone },
+  );
+
+  function patch(index: number, next: Partial<Row>) {
+    setRows((current) => current.map((row, i) => (i === index ? { ...row, ...next } : row)));
+  }
+
+  function add(variant: VariantSearchResult) {
+    if (rows.some((row) => row.variantId === variant.variantId)) return;
+    setRows((current) => [
+      ...current,
+      {
+        variantId: variant.variantId,
+        sku: variant.sku,
+        variantName: variant.variantName,
+        // Defaults to the stock unit; the dropdown offers the pack sizes.
+        orderUomId: variant.stockUomId,
+        orderQty: "1",
+        unitCost: "0",
+        receivedQtyBase: "0",
+        units: unitsFor(variant.stockUomId, variant.stockUomCode, variant.orderUnits ?? []),
+        stockUomId: variant.stockUomId,
+        stockUomCode: variant.stockUomCode,
+      },
+    ]);
+  }
+
+  const subtotal = sumMoney(rows.map((row) => multiplyMoney(row.unitCost, row.orderQty)));
+  const valid = rows.length > 0 && rows.every((row) => Number(row.orderQty) > 0);
+
+  return (
+    <Modal
+      wide
+      title={`Edit lines — ${order.poNumber}`}
+      onClose={onClose}
+      footer={
+        <>
+          <button type="button" onClick={onClose} disabled={save.isPending}>
+            Cancel
+          </button>
+          <button
+            type="button"
+            className={save.isPending ? "primary busy" : "primary"}
+            disabled={!valid || save.isPending}
+            onClick={() =>
+              save.mutate({
+                lines: rows.map((row) => ({
+                  variantId: row.variantId,
+                  orderUomId: row.orderUomId,
+                  orderQty: row.orderQty,
+                  unitCost: row.unitCost,
+                })),
+              })
+            }
+          >
+            Save lines
+          </button>
+        </>
+      }
+    >
+      <ErrorBanner error={save.error} />
+
+      {/*
+        * Re-approval is a consequence worth stating before the edit, not after.
+        * The server voids the approval on save; somebody who did not expect
+        * that would otherwise find the order back in the approver's queue with
+        * no explanation.
+        */}
+      {order.status === "approved" ? (
+        <div className="alert warn">
+          This order has been approved. Changing its lines voids that approval and sends it back
+          for approval again.
+        </div>
+      ) : null}
+
+      <Table
+        head={
+          <tr>
+            <th>Item</th>
+            <th className="num">Quantity</th>
+            <th>Unit</th>
+            <th className="num">Unit cost</th>
+            <th className="num">Line total</th>
+            <th />
+          </tr>
+        }
+      >
+        {rows.map((row, index) => (
+          <tr key={row.variantId}>
+            <td>
+              {row.sku}
+              {row.variantName ? <span className="sub">{row.variantName}</span> : null}
+            </td>
+            <td className="num">
+              <input
+                className="num"
+                inputMode="decimal"
+                style={{ width: "6rem" }}
+                value={row.orderQty}
+                onChange={(e) => patch(index, { orderQty: e.target.value })}
+              />
+            </td>
+            {/*
+              * The unit is editable, on existing lines as much as new ones — a
+              * line raised in pieces because no pack size existed yet should not
+              * have to be removed and re-added once one does. Only the units
+              * this SKU actually has a conversion for: anything else is refused
+              * by the server, and the factor is shown because it is what is
+              * being chosen.
+              */}
+            <td>
+              <select
+                value={row.orderUomId}
+                onChange={(e) => patch(index, { orderUomId: e.target.value })}
+              >
+                {row.units.map((unit) => (
+                  <option key={unit.uomId} value={unit.uomId}>
+                    {unit.uomCode}
+                    {unit.uomId === row.stockUomId
+                      ? " (stock unit)"
+                      : ` (${qty(unit.factorToStockUom)} ${row.stockUomCode})`}
+                  </option>
+                ))}
+              </select>
+            </td>
+            <td className="num">
+              <input
+                className="num"
+                inputMode="decimal"
+                style={{ width: "7rem" }}
+                value={row.unitCost}
+                onChange={(e) => patch(index, { unitCost: e.target.value })}
+              />
+            </td>
+            <td className="num">{money(multiplyMoney(row.unitCost, row.orderQty))}</td>
+            <td>
+              {/*
+                * A line with stock already delivered against it cannot be
+                * removed: the receipt references it, and dropping the line
+                * would leave goods on the shelf that no order accounts for.
+                */}
+              {Number(row.receivedQtyBase) > 0 ? (
+                <Badge tone="info">Delivered</Badge>
+              ) : (
+                <button
+                  type="button"
+                  className="sm subtle-danger"
+                  onClick={() => setRows((current) => current.filter((_, i) => i !== index))}
+                >
+                  Remove
+                </button>
+              )}
+            </td>
+          </tr>
+        ))}
+      </Table>
+
+      {rows.length === 0 ? (
+        <div className="alert warn">
+          An order needs at least one line. Add one below, or cancel to leave it unchanged.
+        </div>
+      ) : null}
+
+      <div className="spread mt">
+        <strong>Subtotal</strong>
+        <strong>{money(subtotal)}</strong>
+      </div>
+
+      <hr />
+
+      <VariantPicker onPick={add} placeholder="Search a product to add" />
+    </Modal>
+  );
+}
+
 export function PurchaseOrderDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { can } = useSessionContext();
   const [reason, setReason] = useState("");
+  const [editingLines, setEditingLines] = useState(false);
 
   const po = useApi<PurchaseOrderDetail>(["purchase-orders", id], `/purchase-orders/${id}`);
 
@@ -72,6 +339,18 @@ export function PurchaseOrderDetailPage() {
         actions={
           <>
             <Badge tone={statusTone(order.status)}>{humanise(order.status)}</Badge>
+
+            {/*
+              * Editable until the order is SENT, not merely while it is a
+              * draft. Everything before "ordered" is still internal: nothing
+              * has reached the supplier, and a buyer who remembers a second
+              * item should not have to cancel and re-key the order.
+              */}
+            {EDITABLE_STATUSES.includes(order.status) && can("po:write") ? (
+              <button type="button" onClick={() => setEditingLines(true)}>
+                Edit lines
+              </button>
+            ) : null}
 
             {order.status === "draft" && can("po:submit") ? (
               <ConfirmButton
@@ -240,6 +519,17 @@ export function PurchaseOrderDetailPage() {
           })}
         </Table>
       </Card>
+
+      {editingLines ? (
+        <EditLines
+          order={order}
+          onClose={() => setEditingLines(false)}
+          onDone={() => {
+            setEditingLines(false);
+            void po.refetch();
+          }}
+        />
+      ) : null}
 
       <Card title="Deliveries against this order" flush>
         {order.receipts.length === 0 ? (

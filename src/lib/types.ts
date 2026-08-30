@@ -302,6 +302,11 @@ export interface PurchaseOrderLine {
   /** Carried from the product so receiving knows whether to demand an expiry. */
   trackExpiry: boolean;
   trackSerial: boolean;
+  /** The SKU's own unit, so the order unit can be changed back to it. */
+  stockUomId: string;
+  stockUomCode: string;
+  /** The pack sizes this SKU may be ordered in, beyond its stock unit. */
+  orderUnits: OrderUnit[];
   isDivisible: boolean;
 }
 
@@ -353,6 +358,12 @@ export interface GoodsReceiptLine {
   sku: string;
   variantName: string | null;
   receiptUomCode: string;
+  /** The unit's id, so an amendment can send back what it was received in. */
+  receiptUomId: string;
+  /** The SKU's own unit and pack sizes, so the receipt unit can be corrected. */
+  stockUomId: string;
+  stockUomCode: string;
+  orderUnits: OrderUnit[];
   receiptQty: string;
   receiptQtyBase: string;
   rejectedQtyBase: string;
@@ -424,6 +435,8 @@ export interface TransferLine {
   shortageQty: string;
   /** The unit the quantities above are in. */
   stockUomCode: string;
+  /** ...and its id, which an amendment quotes as the request unit. */
+  stockUomId: string;
   shortageReason: string | null;
   notes: string | null;
 }

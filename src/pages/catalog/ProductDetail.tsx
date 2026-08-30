@@ -34,6 +34,7 @@ export function ProductDetailPage() {
   const [editing, setEditing] = useState(false);
   const [addingSku, setAddingSku] = useState(false);
   const [barcoding, setBarcoding] = useState<ProductVariantDetail | null>(null);
+  const [editingSku, setEditingSku] = useState<ProductVariantDetail | null>(null);
   const [pricing, setPricing] = useState<ProductVariantDetail | null>(null);
   const [converting, setConverting] = useState<ProductVariantDetail | null>(null);
 
@@ -239,6 +240,11 @@ export function ProductDetailPage() {
               </td>
               <td>
                 <div className="btn-row">
+                  {can("catalog:write") ? (
+                    <button type="button" className="sm" onClick={() => setEditingSku(variant)}>
+                      Edit
+                    </button>
+                  ) : null}
                   {can("price:write") ? (
                     <button type="button" className="sm" onClick={() => setPricing(variant)}>
                       Set price
@@ -283,6 +289,18 @@ export function ProductDetailPage() {
 
       {barcoding ? (
         <BarcodeDialog variant={barcoding} onClose={() => setBarcoding(null)} />
+      ) : null}
+
+      {editingSku ? (
+        <EditSku
+          variant={editingSku}
+          item={item}
+          onClose={() => setEditingSku(null)}
+          onDone={() => {
+            setEditingSku(null);
+            void product.refetch();
+          }}
+        />
       ) : null}
 
       {pricing ? (
@@ -933,6 +951,164 @@ function ArchiveProduct({ item }: { item: ProductDetail }) {
       }
       onConfirm={() => archive.mutateAsync(undefined)}
     />
+  );
+}
+
+/**
+ * Edit a SKU.
+ *
+ * Everything here was write-once until the API gained a PATCH: settable when
+ * the SKU was created and unreachable afterwards. A SKU added in a hurry could
+ * never be named, and one created without a shelf life could never be given
+ * one.
+ *
+ * The patch carries only what CHANGED. Sending the whole form back would make
+ * every save an edit of every field, so two people working on the same SKU
+ * would silently overwrite each other's untouched values; and an empty box has
+ * to mean "clear this", which the API expresses as an explicit null rather than
+ * an omitted key.
+ */
+function EditSku({
+  variant,
+  item,
+  onClose,
+  onDone,
+}: {
+  variant: ProductVariantDetail;
+  item: ProductDetail;
+  onClose: () => void;
+  onDone: () => void;
+}) {
+  const [sku, setSku] = useState(variant.sku);
+  const [variantName, setVariantName] = useState(variant.variantName ?? "");
+  const [shelfLifeDays, setShelfLife] = useState(
+    variant.shelfLifeDays === null ? "" : String(variant.shelfLifeDays),
+  );
+  const [reorderPoint, setReorderPoint] = useState(variant.reorderPoint ?? "");
+  const [reorderQty, setReorderQty] = useState(variant.reorderQty ?? "");
+
+  const save = useApiMutation<Record<string, unknown>, unknown>(
+    `/catalog/variants/${variant.id}`,
+    { method: "PATCH", invalidate: [["catalog"]], onSuccess: onDone },
+  );
+
+  function submit() {
+    const patch: Record<string, unknown> = {};
+
+    // A trimmed empty string is a cleared field, which is `null`, not "".
+    const text = (value: string) => (value.trim() === "" ? null : value.trim());
+
+    if (sku.trim() !== variant.sku) patch.sku = sku.trim();
+    if (text(variantName) !== (variant.variantName ?? null)) {
+      patch.variantName = text(variantName);
+    }
+
+    const shelf = shelfLifeDays.trim() === "" ? null : Number(shelfLifeDays);
+    if (shelf !== variant.shelfLifeDays) patch.shelfLifeDays = shelf;
+
+    /*
+     * Compared as NUMBERS, not strings.
+     *
+     * The API returns a numeric column as "100.0000" while the input holds
+     * whatever was typed, so "100" and "100.0000" are the same value and a
+     * string comparison would send a pointless patch on every save.
+     */
+    const sameQty = (typed: string, stored: string | null) => {
+      const left = typed.trim() === "" ? null : Number(typed);
+      const right = stored === null ? null : Number(stored);
+      return left === right || (left === null && right === null);
+    };
+    if (!sameQty(reorderPoint, variant.reorderPoint)) {
+      patch.reorderPoint = reorderPoint.trim() === "" ? null : reorderPoint.trim();
+    }
+    if (!sameQty(reorderQty, variant.reorderQty)) {
+      patch.reorderQty = reorderQty.trim() === "" ? null : reorderQty.trim();
+    }
+
+    // The API refuses an empty patch, and it is right to — but the user
+    // pressing Save on an untouched form meant no harm, so just close.
+    if (Object.keys(patch).length === 0) {
+      onClose();
+      return;
+    }
+
+    save.mutate(patch);
+  }
+
+  return (
+    <Modal
+      title={`Edit ${variant.sku}`}
+      onClose={onClose}
+      footer={
+        <>
+          <button type="button" onClick={onClose} disabled={save.isPending}>
+            Cancel
+          </button>
+          <button
+            type="button"
+            className={save.isPending ? "primary busy" : "primary"}
+            disabled={save.isPending || !sku.trim()}
+            onClick={submit}
+          >
+            Save changes
+          </button>
+        </>
+      }
+    >
+      <ErrorBanner error={save.error} />
+
+      <div className="grid cols-2">
+        <TextField
+          label="SKU code"
+          className="mono"
+          value={sku}
+          onChange={(e) => setSku(e.target.value.toUpperCase())}
+          help="Safe to rename — bills and stock movements follow the SKU itself, not its code."
+        />
+        <TextField
+          label="Variant name"
+          value={variantName}
+          placeholder="1 kg, Red / L"
+          onChange={(e) => setVariantName(e.target.value)}
+          help="What tells this one apart. Leave blank if nothing does."
+        />
+      </div>
+
+      <div className="grid cols-2">
+        <TextField
+          label={`Reorder point (${item.stockUomCode})`}
+          className="num"
+          inputMode="decimal"
+          value={reorderPoint}
+          onChange={(e) => setReorderPoint(e.target.value)}
+          help="Empty to stop tracking one."
+        />
+        <TextField
+          label={`Reorder quantity (${item.stockUomCode})`}
+          className="num"
+          inputMode="decimal"
+          value={reorderQty}
+          onChange={(e) => setReorderQty(e.target.value)}
+          help="Drives the suggested quantity on the reorder report."
+        />
+      </div>
+
+      {item.trackExpiry ? (
+        <TextField
+          label="Typical shelf life (days)"
+          className="num"
+          inputMode="numeric"
+          value={shelfLifeDays}
+          onChange={(e) => setShelfLife(e.target.value)}
+          help="Lets an expiry be worked out when a supplier prints only a manufacture date."
+        />
+      ) : null}
+
+      <p className="hint mt">
+        Price and barcodes are changed from the SKU row — each is versioned, so they are not
+        edited here.
+      </p>
+    </Modal>
   );
 }
 

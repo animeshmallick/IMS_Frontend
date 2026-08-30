@@ -9,11 +9,13 @@ import {
   ConfirmButton,
   ErrorBanner,
   Loading,
+  Modal,
   PageHead,
   Table,
 } from "../../components/ui";
 import { date, dateTime, humanise, qty, statusTone } from "../../lib/format";
-import type { TransferDetail } from "../../lib/types";
+import type { TransferDetail, VariantSearchResult } from "../../lib/types";
+import { VariantPicker } from "../../components/VariantPicker";
 
 /**
  * One transfer, through its two legs.
@@ -25,12 +27,198 @@ import type { TransferDetail } from "../../lib/types";
  * recognises a stock LOSS — the person who unloads the van does not get to sign
  * off that the missing units are gone.
  */
+/**
+ * Amend a transfer that has not been dispatched.
+ *
+ * Edited as a REQUEST, not as the stored lines.
+ *
+ * The lines on the record are per-batch allocations: asking for 100 of a SKU
+ * can produce three lines if the allocator had to draw on three batches, and
+ * which batches those are is FEFO's decision rather than the user's. So the
+ * dialog aggregates them back into one row per SKU, and the server re-allocates
+ * from scratch when it saves. Editing the stored rows directly would mean
+ * hand-picking batches, which is neither what the user meant nor safe.
+ */
+function EditTransfer({
+  doc,
+  onClose,
+  onDone,
+}: {
+  doc: TransferDetail;
+  onClose: () => void;
+  onDone: () => void;
+}) {
+  interface Row {
+    variantId: string;
+    sku: string;
+    variantName: string | null;
+    stockUomId: string;
+    stockUomCode: string;
+    qty: string;
+  }
+
+  const [rows, setRows] = useState<Row[]>(() => {
+    // One row per SKU, summing whatever batches it was allocated across.
+    const byVariant = new Map<string, Row>();
+    for (const line of doc.lines) {
+      const found = byVariant.get(line.variantId);
+      if (found) {
+        found.qty = String(Number(found.qty) + Number(line.requestedQty));
+      } else {
+        byVariant.set(line.variantId, {
+          variantId: line.variantId,
+          sku: line.sku,
+          variantName: line.variantName,
+          stockUomId: line.stockUomId,
+          stockUomCode: line.stockUomCode,
+          qty: String(Number(line.requestedQty)),
+        });
+      }
+    }
+    return [...byVariant.values()];
+  });
+
+  const save = useApiMutation<Record<string, unknown>, unknown>(
+    `/stock-transfers/${doc.id}`,
+    { method: "PUT", invalidate: [["transfers"], ["stock"]], onSuccess: onDone },
+  );
+
+  function add(variant: VariantSearchResult) {
+    // The allocator refuses a SKU twice on one transfer, so adding one that is
+    // already here edits the existing row rather than making a second.
+    if (rows.some((row) => row.variantId === variant.variantId)) return;
+    setRows((current) => [
+      ...current,
+      {
+        variantId: variant.variantId,
+        sku: variant.sku,
+        variantName: variant.variantName,
+        stockUomId: variant.stockUomId,
+        stockUomCode: variant.stockUomCode,
+        qty: "1",
+      },
+    ]);
+  }
+
+  const valid = rows.length > 0 && rows.every((row) => Number(row.qty) > 0);
+
+  return (
+    <Modal
+      wide
+      title={`Edit ${doc.transferNumber}`}
+      onClose={onClose}
+      footer={
+        <>
+          <button type="button" onClick={onClose} disabled={save.isPending}>
+            Cancel
+          </button>
+          <button
+            type="button"
+            className={save.isPending ? "primary busy" : "primary"}
+            disabled={!valid || save.isPending}
+            onClick={() =>
+              save.mutate({
+                fromLocationId: doc.fromLocationId,
+                toLocationId: doc.toLocationId,
+                lines: rows.map((row) => ({
+                  variantId: row.variantId,
+                  requestUomId: row.stockUomId,
+                  requestQty: row.qty,
+                })),
+              })
+            }
+          >
+            Save changes
+          </button>
+        </>
+      }
+    >
+      <ErrorBanner error={save.error} />
+
+      {/*
+        * Said before the edit, not after it fails.
+        *
+        * Saving releases the stock this transfer is holding and reserves it
+        * again from scratch, so a SKU someone else has since taken can come
+        * back as "insufficient stock" on a line that was fine a minute ago.
+        * The transfer keeps what it had if that happens — the whole save is one
+        * transaction — but the refusal is much less alarming when it was
+        * expected.
+        */}
+      <div className="alert info">
+        Saving re-reserves the stock for this transfer. If something has been sold or moved in the
+        meantime, a line may no longer be available — nothing is changed if that happens.
+      </div>
+
+      <Table
+        head={
+          <tr>
+            <th>Item</th>
+            <th className="num">Quantity</th>
+            <th />
+          </tr>
+        }
+      >
+        {rows.map((row, index) => (
+          <tr key={row.variantId}>
+            <td>
+              {row.sku}
+              {row.variantName ? <span className="sub">{row.variantName}</span> : null}
+            </td>
+            <td className="num">
+              <div className="row" style={{ justifyContent: "flex-end" }}>
+                <input
+                  className="num"
+                  inputMode="decimal"
+                  style={{ width: "7rem" }}
+                  value={row.qty}
+                  onChange={(e) =>
+                    setRows((current) =>
+                      current.map((r, i) => (i === index ? { ...r, qty: e.target.value } : r)),
+                    )
+                  }
+                />
+                <span className="muted small">{row.stockUomCode}</span>
+              </div>
+            </td>
+            <td>
+              <button
+                type="button"
+                className="sm subtle-danger"
+                onClick={() => setRows((current) => current.filter((_, i) => i !== index))}
+              >
+                Remove
+              </button>
+            </td>
+          </tr>
+        ))}
+      </Table>
+
+      {rows.length === 0 ? (
+        <div className="alert warn">
+          A transfer needs at least one line. Add one below, or cancel to leave it unchanged.
+        </div>
+      ) : null}
+
+      <hr />
+
+      <VariantPicker onPick={add} placeholder="Search a product to add" />
+
+      <p className="hint mt">
+        Quantities are in each product&rsquo;s stock unit. Which batches are sent is decided when
+        you save, oldest first.
+      </p>
+    </Modal>
+  );
+}
+
 export function TransferDetailPage() {
   const { id } = useParams<{ id: string }>();
   const { can } = useSessionContext();
   const units = useUnits();
   const [received, setReceived] = useState<Record<string, string>>({});
   const [reason, setReason] = useState("");
+  const [editing, setEditing] = useState(false);
 
   const transfer = useApi<TransferDetail>(["transfers", id], `/stock-transfers/${id}`);
 
@@ -75,6 +263,17 @@ export function TransferDetailPage() {
         actions={
           <>
             <Badge tone={statusTone(doc.status)}>{humanise(doc.status)}</Badge>
+
+            {/*
+              * Amendable until it is dispatched. After that the stock has
+              * physically left and sits in transit, so the document describes a
+              * van already on the road.
+              */}
+            {doc.status === "draft" && can("stock:transfer") ? (
+              <button type="button" onClick={() => setEditing(true)}>
+                Edit transfer
+              </button>
+            ) : null}
 
             {canDispatch ? (
               <ConfirmButton
@@ -145,6 +344,17 @@ export function TransferDetailPage() {
           Stock is reserved at {doc.fromName} but has not moved. It cannot be sold at the counter
           while this transfer is open.
         </div>
+      ) : null}
+
+      {editing ? (
+        <EditTransfer
+          doc={doc}
+          onClose={() => setEditing(false)}
+          onDone={() => {
+            setEditing(false);
+            void transfer.refetch();
+          }}
+        />
       ) : null}
 
       {outstanding > 0 && doc.status !== "draft" ? (
