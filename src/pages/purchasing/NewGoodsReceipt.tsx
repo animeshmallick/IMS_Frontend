@@ -12,6 +12,7 @@ import {
 } from "../../components/ui";
 import { money, multiplyMoney, qty, sumMoney, toDateInput } from "../../lib/format";
 import type { PurchaseOrderDetail } from "../../lib/types";
+import { ReceiveScan } from "./ReceiveScan";
 
 interface ReceiptLine {
   purchaseOrderLineId: string;
@@ -61,6 +62,8 @@ export function NewGoodsReceipt() {
   );
 
   const [lines, setLines] = useState<ReceiptLine[]>([]);
+  /** The line a scan just landed on, so it can be picked out of a long list. */
+  const [scanned, setScanned] = useState<string | null>(null);
   const [invoiceNo, setInvoiceNo] = useState("");
   const [invoiceDate, setInvoiceDate] = useState(toDateInput(new Date()));
   const [deliveryNote, setDeliveryNote] = useState("");
@@ -251,6 +254,35 @@ export function NewGoodsReceipt() {
         actions={<strong className="num">{money(total)}</strong>}
         flush
       >
+        {/*
+          * Receiving is where a barcode is first seen. A product bought for the
+          * first time was created before anyone had the packet in hand, so the
+          * code on it cannot have been entered in advance — this is the only
+          * moment it can be captured without guessing.
+          */}
+        <ReceiveScan
+          lines={lines.map((l) => ({
+            purchaseOrderLineId: l.purchaseOrderLineId,
+            variantId: l.variantId,
+            sku: l.sku,
+            variantName: l.variantName,
+          }))}
+          onMatch={(id) => {
+            setScanned(id);
+            // A scan means the goods are in front of you, so include the line
+            // rather than making it a second click.
+            setLines((current) =>
+              current.map((l) =>
+                l.purchaseOrderLineId === id ? { ...l, include: true } : l,
+              ),
+            );
+            document
+              .querySelector(`[data-line="${id}"]`)
+              ?.scrollIntoView({ block: "center", behavior: "smooth" });
+          }}
+          onLinked={() => void po.refetch()}
+        />
+
         <Table
           head={
             <tr>
@@ -271,7 +303,11 @@ export function NewGoodsReceipt() {
           }
         >
           {lines.map((line, index) => (
-            <tr key={line.purchaseOrderLineId}>
+            <tr
+              key={line.purchaseOrderLineId}
+              data-line={line.purchaseOrderLineId}
+              className={scanned === line.purchaseOrderLineId ? "success" : ""}
+            >
               <td>
                 <input
                   type="checkbox"
